@@ -99,6 +99,7 @@ def report_ventas():
     POST /api/bi/report/ventas
     Body: { date_from, date_to, users[], payment_methods[], force_refresh }
     """
+    print("[FLASK] Generando reporte de ventas...")
     try:
         payload = request.get_json()
         

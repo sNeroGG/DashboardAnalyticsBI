@@ -11,6 +11,7 @@ import { StatsCards } from '@/components/dashboard/stats-cards'
 import { FiltersSection } from '@/components/dashboard/filters-section'
 import { ChartsSection } from '@/components/dashboard/charts-section'
 import { ReportTabs } from '@/components/dashboard/report-tabs'
+import { DataTable } from '@/components/dashboard/data-table'
 import type { ReportPayload } from '@/lib/types'
 
 export default function DashboardPage() {
@@ -28,6 +29,8 @@ export default function DashboardPage() {
         groups: [] as string[]
     })
     const [shouldFetchReport, setShouldFetchReport] = useState(false)
+    const [activeMainView, setActiveMainView] = useState<'dashboard' | 'detalles'>('dashboard')
+    const [isForcingRefresh, setIsForcingRefresh] = useState(false)
 
     // Load masters (users, payment methods)
     const { data: masters, isLoading: mastersLoading } = useQuery({
@@ -37,8 +40,6 @@ export default function DashboardPage() {
             return response.data
         },
     })
-
-    // Load report data
     const { data: reportData, isLoading: reportLoading, refetch } = useQuery({
         queryKey: ['report', submittedFilters],
         queryFn: async () => {
@@ -48,9 +49,11 @@ export default function DashboardPage() {
                 users: submittedFilters.users.length > 0 ? submittedFilters.users : undefined,
                 payment_methods: submittedFilters.payments.length > 0 ? submittedFilters.payments : undefined,
                 product_groups: submittedFilters.groups.length > 0 ? submittedFilters.groups : undefined,
-                force_refresh: false,
+                force_refresh: isForcingRefresh,
             }
             const response = await dashboardAPI.getReportVentas(payload)
+            // Reset force refresh after success
+            if (isForcingRefresh) setIsForcingRefresh(false)
             return response.data
         },
         enabled: shouldFetchReport,
@@ -68,7 +71,8 @@ export default function DashboardPage() {
         router.push('/login')
     }
 
-    const handleFetchReport = () => {
+    const handleFetchReport = (force: boolean = false) => {
+        if (force) setIsForcingRefresh(true)
         setSubmittedFilters({
             dateFrom,
             dateTo,
@@ -98,7 +102,30 @@ export default function DashboardPage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                             </svg>
                         </div>
-                        <h1 className="text-xl font-bold text-primary">BI ANALYTICS</h1>
+                        <h1 className="text-xl font-bold text-primary mr-8">BI ANALYTICS</h1>
+                        
+                        <div className="hidden md:flex items-center space-x-2">
+                            <button
+                                onClick={() => setActiveMainView('dashboard')}
+                                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                                    activeMainView === 'dashboard'
+                                        ? 'bg-primary text-primary-foreground'
+                                        : 'text-muted-foreground hover:bg-card/80 hover:text-foreground'
+                                }`}
+                            >
+                                Dashboard
+                            </button>
+                            <button
+                                onClick={() => setActiveMainView('detalles')}
+                                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                                    activeMainView === 'detalles'
+                                        ? 'bg-primary text-primary-foreground'
+                                        : 'text-muted-foreground hover:bg-card/80 hover:text-foreground'
+                                }`}
+                            >
+                                Detalles Específicos
+                            </button>
+                        </div>
                     </div>
                     <Button variant="outline" size="sm" onClick={handleLogout}>
                         <LogOut className="mr-2 h-4 w-4" />
@@ -125,14 +152,23 @@ export default function DashboardPage() {
                     isLoading={reportLoading}
                 />
 
-                {/* Stats Cards */}
-                {reportData && <StatsCards data={reportData.data || []} />}
+                {/* Views */}
+                {activeMainView === 'dashboard' ? (
+                    <div className="space-y-6">
+                        {/* Stats Cards */}
+                        {reportData && <StatsCards data={reportData.data || []} />}
 
-                {/* Charts */}
-                {reportData && <ChartsSection data={reportData.data || []} />}
+                        {/* Charts */}
+                        {reportData && <ChartsSection data={reportData.data || []} />}
 
-                {/* Table / Tabs */}
-                {reportData && <ReportTabs reportData={reportData} masters={masters} selectedPayments={submittedFilters.payments} />}
+                        {/* Table / Tabs */}
+                        {reportData && <ReportTabs reportData={reportData} masters={masters} selectedPayments={submittedFilters.payments} />}
+                    </div>
+                ) : (
+                    <div className="space-y-6">
+                        {reportData && <DataTable data={reportData.data || []} />}
+                    </div>
+                )}
             </div>
         </div>
     )

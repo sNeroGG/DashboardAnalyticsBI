@@ -14,12 +14,21 @@ export interface ReportSessionDesglose {
     monto: number
 }
 
+export interface ReportCuenta {
+    id: number
+    nombre: string
+    total: number
+    propina: number
+    estado: string
+}
+
 export interface ReportSession {
     id: number
     name: string
     total_cuentas: number
     total_pagado: number
     desglose?: ReportSessionDesglose[]
+    cuentas?: ReportCuenta[]
 }
 
 export interface ReportRow {

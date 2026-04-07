@@ -1,9 +1,8 @@
 import React, { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { DataTable } from '@/components/dashboard/data-table'
 import { formatCurrency } from '@/lib/utils'
 import type { ReportData, Masters } from '@/lib/types'
-import { Users, CreditCard, Table as TableIcon } from 'lucide-react'
+import { Users, CreditCard } from 'lucide-react'
 
 interface ReportTabsProps {
     reportData: ReportData
@@ -12,10 +11,10 @@ interface ReportTabsProps {
 }
 
 export function ReportTabs({ reportData, masters, selectedPayments }: ReportTabsProps) {
-    const [activeTab, setActiveTab] = useState<'jornadas' | 'usuarios' | 'metodos'>('jornadas')
+    const [activeTab, setActiveTab] = useState<'usuarios' | 'metodos'>('usuarios')
 
     // Mapear los métodos de la API de Masters
-    const metodosMaestros = masters['pos.payment.method'] || []
+    const metodosMaestros = masters?.['pos.payment.method'] || []
 
     // Cruzar métodos retornados con los maestros para asegurar los $0
     const metodosCalculados = metodosMaestros.map(m => {
@@ -40,17 +39,6 @@ export function ReportTabs({ reportData, masters, selectedPayments }: ReportTabs
         <div className="space-y-4">
             {/* Pestañas / Botonera */}
             <div className="flex flex-wrap gap-2">
-                <button
-                    onClick={() => setActiveTab('jornadas')}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                        activeTab === 'jornadas' 
-                            ? 'bg-primary text-primary-foreground' 
-                            : 'bg-card text-muted-foreground hover:bg-card/80 hover:text-foreground'
-                    }`}
-                >
-                    <TableIcon className="h-4 w-4" />
-                    Jornadas Laborales
-                </button>
                 <button
                     onClick={() => setActiveTab('usuarios')}
                     className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -77,9 +65,6 @@ export function ReportTabs({ reportData, masters, selectedPayments }: ReportTabs
 
             {/* Contenido */}
             <div className="mt-4">
-                {activeTab === 'jornadas' && (
-                    <DataTable data={reportData.data || []} />
-                )}
 
                 {activeTab === 'usuarios' && (
                     <Card>

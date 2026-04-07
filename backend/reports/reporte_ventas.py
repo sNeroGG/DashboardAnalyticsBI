@@ -36,7 +36,7 @@ def generate_report(odoo, date_from, date_to, users=None, payment_methods=None, 
         domain.append(("user_id", "in", users))
         
     fields = [
-        "id", "date_order", "amount_total", "session_id", "user_id", "state"
+        "id", "name", "pos_reference", "date_order", "amount_total", "session_id", "user_id", "state", "tip_amount"
     ]
     
     try:
@@ -163,8 +163,8 @@ def generate_report(odoo, date_from, date_to, users=None, payment_methods=None, 
             
         summary[d_str]["total_cuentas"] += 1
         
-        total = order.get("amount_total", 0)
-        tip = order.get("tip_amount", 0) 
+        total = order.get("amount_total") or 0.0
+        tip = order.get("tip_amount") or 0.0
         
         # Agrupación por Usuario
         u_raw = order.get("user_id")
@@ -194,12 +194,23 @@ def generate_report(odoo, date_from, date_to, users=None, payment_methods=None, 
                 "name": s_name,
                 "total_cuentas": 0,
                 "total_pagado": real_payment,
-                "desglose": desglose_arr
+                "desglose": desglose_arr,
+                "cuentas": []
             }
             # Sumamos al día el bloque completo de la sesión una sola vez
             summary[d_str]["total_pagado"] += real_payment
             
         summary[d_str]["sesiones_dict"][s_id]["total_cuentas"] += 1
+        
+        # Guardar el detalle de la cuenta
+        summary[d_str]["sesiones_dict"][s_id]["cuentas"].append({
+            "id": order.get("id"),
+            "nombre": order.get("pos_reference") or order.get("name") or f"Orden {order.get('id')}",
+            "total": total,
+            "propina": tip,
+            "estado": order.get("state", "Desconocido")
+        })
+        
         summary[d_str]["propina"] += tip
         
         gastable = total - tip
