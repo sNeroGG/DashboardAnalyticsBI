@@ -43,12 +43,12 @@ export function DataTable({ data }: DataTableProps) {
                             <tr className="border-b border-border">
                                 <th className="px-4 py-3 text-left text-sm font-semibold w-32">Fecha</th>
                                 <th className="px-4 py-3 text-right text-sm font-semibold">Cuentas</th>
-                                <th className="px-4 py-3 text-right text-sm font-semibold">Total</th>
                                 <th className="px-4 py-3 text-right text-sm font-semibold">Alimentos</th>
                                 <th className="px-4 py-3 text-right text-sm font-semibold">Bebidas</th>
                                 <th className="px-4 py-3 text-right text-sm font-semibold">Propina</th>
                                 <th className="px-4 py-3 text-right text-sm font-semibold">Efectivo</th>
                                 <th className="px-4 py-3 text-right text-sm font-semibold">Tarjeta</th>
+                                <th className="px-4 py-3 text-right text-sm font-semibold">Total</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -67,12 +67,12 @@ export function DataTable({ data }: DataTableProps) {
                                             {row.fecha}
                                         </td>
                                         <td className="px-4 py-3 text-right text-sm">{row.total_cuentas}</td>
-                                        <td className="px-4 py-3 text-right text-sm font-bold text-primary">{formatCurrency(row.total_pagado)}</td>
                                         <td className="px-4 py-3 text-right text-sm text-slate-400">{formatCurrency(row.alimentos)}</td>
                                         <td className="px-4 py-3 text-right text-sm text-slate-400">{formatCurrency(row.bebidas)}</td>
                                         <td className="px-4 py-3 text-right text-sm text-emerald-400">{formatCurrency(row.propina)}</td>
                                         <td className="px-4 py-3 text-right text-sm text-blue-400">{formatCurrency(row.restaurante_efectivo)}</td>
                                         <td className="px-4 py-3 text-right text-sm text-purple-400">{formatCurrency(row.tarjeta)}</td>
+                                        <td className="px-4 py-3 text-right text-sm font-bold text-primary">{formatCurrency(row.total_pagado)}</td>
                                     </tr>
                                     
                                     {expandedRows[row.fecha] && (

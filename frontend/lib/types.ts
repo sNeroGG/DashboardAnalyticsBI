@@ -36,7 +36,9 @@ export interface ReportRow {
 }
 
 export interface ReportData {
-    rows: ReportRow[]
+    data: ReportRow[]
+    usuarios: any[] // Temporal, podemos tipar mas estricto despues
+    metodos: any[]
 }
 
 export interface ReportPayload {

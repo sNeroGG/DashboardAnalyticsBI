@@ -10,7 +10,7 @@ import { LogOut, Loader2 } from 'lucide-react'
 import { StatsCards } from '@/components/dashboard/stats-cards'
 import { FiltersSection } from '@/components/dashboard/filters-section'
 import { ChartsSection } from '@/components/dashboard/charts-section'
-import { DataTable } from '@/components/dashboard/data-table'
+import { ReportTabs } from '@/components/dashboard/report-tabs'
 import type { ReportPayload } from '@/lib/types'
 
 export default function DashboardPage() {
@@ -131,8 +131,8 @@ export default function DashboardPage() {
                 {/* Charts */}
                 {reportData && <ChartsSection data={reportData.data || []} />}
 
-                {/* Table */}
-                {reportData && <DataTable data={reportData.data || []} />}
+                {/* Table / Tabs */}
+                {reportData && <ReportTabs reportData={reportData} masters={masters} selectedPayments={submittedFilters.payments} />}
             </div>
         </div>
     )

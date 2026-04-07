@@ -36,7 +36,7 @@ def generate_report(odoo, date_from, date_to, users=None, payment_methods=None, 
         domain.append(("user_id", "in", users))
         
     fields = [
-        "id", "date_order", "amount_total", "session_id"
+        "id", "date_order", "amount_total", "session_id", "user_id", "state"
     ]
     
     try:
@@ -72,10 +72,12 @@ def generate_report(odoo, date_from, date_to, users=None, payment_methods=None, 
 
     # Mapear pagos exactos por sesión y agrupar por fecha de pago local (para desglose nocturno)
     session_ids = list(session_start_dates.keys())
-    session_payments = {}  # { s_id: {'total': 0.0, 'desglose': {'2026-04-01': 1000, '2026-04-02': 500}} }
+    session_payments = {}  # { s_id: {'total': 0.0, 'desglose': {}} }
+    metodos_raw_stats = {} # { method_name: total }
+
     if session_ids:
         try:
-            payments = odoo.search("pos.payment", [("session_id", "in", session_ids)], ["id", "amount", "session_id", "payment_date"])
+            payments = odoo.search("pos.payment", [("session_id", "in", session_ids)], ["id", "amount", "session_id", "payment_date", "payment_method_id"])
             for p in payments:
                 s_val = p.get("session_id")
                 s_id = None
@@ -93,6 +95,18 @@ def generate_report(odoo, date_from, date_to, users=None, payment_methods=None, 
                     amt = p.get("amount", 0)
                     session_payments[s_id]['total'] += amt
                     
+                    pm_raw = p.get("payment_method_id")
+                    pm_name = "Desconocido"
+                    if isinstance(pm_raw, list) and len(pm_raw) > 0:
+                        if isinstance(pm_raw[0], dict):
+                            pm_name = pm_raw[0].get("name", "Desconocido")
+                        elif len(pm_raw) > 1:
+                            pm_name = pm_raw[1]
+                    elif isinstance(pm_raw, dict):
+                        pm_name = pm_raw.get("name", "Desconocido")
+                    
+                    metodos_raw_stats[pm_name] = metodos_raw_stats.get(pm_name, 0) + amt
+                    
                     pay_date_local = to_business_date(p.get("payment_date", ""))
                     if pay_date_local:
                         session_payments[s_id]['desglose'][pay_date_local] = session_payments[s_id]['desglose'].get(pay_date_local, 0) + amt
@@ -102,6 +116,7 @@ def generate_report(odoo, date_from, date_to, users=None, payment_methods=None, 
 
     # Diccionario para agrupar variables sumarizadas por fecha (DÍA PADRE DE LA SESIÓN)
     summary = {}
+    usuarios_stats = {}
     
     for order in orders:
         s_id_raw = order.get("session_id")
@@ -151,6 +166,21 @@ def generate_report(odoo, date_from, date_to, users=None, payment_methods=None, 
         total = order.get("amount_total", 0)
         tip = order.get("tip_amount", 0) 
         
+        # Agrupación por Usuario
+        u_raw = order.get("user_id")
+        u_name = "Desconocido"
+        if isinstance(u_raw, list) and len(u_raw) > 0:
+            if isinstance(u_raw[0], dict):
+                u_name = u_raw[0].get("name", "Desconocido")
+            elif len(u_raw) > 1:
+                u_name = u_raw[1]
+        elif isinstance(u_raw, dict):
+            u_name = u_raw.get("name", "Desconocido")
+        if u_name not in usuarios_stats:
+            usuarios_stats[u_name] = {"nombre": u_name, "ventas": 0, "cuentas": 0}
+        usuarios_stats[u_name]["ventas"] += total
+        usuarios_stats[u_name]["cuentas"] += 1
+        
         # Sub-agrupación por sesión e inyección del desglose de pos.payment
         if s_id not in summary[d_str]["sesiones_dict"]:
             sp = session_payments.get(s_id, {'total': 0.0, 'desglose': {}})
@@ -186,5 +216,15 @@ def generate_report(odoo, date_from, date_to, users=None, payment_methods=None, 
         v["sesiones"] = list(v["sesiones_dict"].values())
         del v["sesiones_dict"]
         results.append(v)
+        
+    # Formatear array de usuarios
+    usuarios_arr = [{"nombre": v["nombre"], "ventas": v["ventas"], "cuentas": v["cuentas"]} for k,v in sorted(usuarios_stats.items(), key=lambda item: item[1]["ventas"], reverse=True)]
     
-    return {"data": results}
+    # Formatear array de metodos
+    metodos_arr = [{"metodo": k, "monto": v} for k, v in sorted(metodos_raw_stats.items(), key=lambda item: item[1], reverse=True)]
+    
+    return {
+        "data": results,
+        "usuarios": usuarios_arr,
+        "metodos": metodos_arr
+    }
