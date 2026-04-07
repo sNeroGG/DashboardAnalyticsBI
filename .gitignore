@@ -1,0 +1,23 @@
+# Dependencias y entornos
+node_modules/
+.npm/
+__pycache__/
+*.pyc
+venv/
+env/
+.env
+
+# Configuración sensible/Local
+backend/cache/
+*.json.bak
+
+# Next.js
+.next/
+out/
+build/
+.swc/
+
+# Entornos de desarrollo locales
+.vscode/
+.idea/
+.DS_Store

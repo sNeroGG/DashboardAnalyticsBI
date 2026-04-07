@@ -1,0 +1,52 @@
+{
+  "odoo": {
+    "url": "",
+    "db": "",
+    "api_key": ""
+  },
+  "paths": {
+    "masters_cache": "cache/masters.json"
+  },
+  "masters": {
+    "res.users": [
+      "id",
+      "partner_id"
+    ],
+    "res.partner": [
+      "id",
+      "name"
+    ],
+    "pos.config": [
+      "id",
+      "name"
+    ],
+    "pos.payment.method": [
+      "id",
+      "name"
+    ],
+    "product.category": [
+      "id",
+      "name"
+    ],
+    "pos.category": [
+      "id",
+      "name",
+      "product_group"
+    ],
+    "stock.warehouse": [
+      "id",
+      "name"
+    ],
+    "stock.location": [
+      "id",
+      "name",
+      "usage"
+    ],
+    "account.journal": [
+      "id",
+      "name",
+      "type",
+      "fe_tipo_dte"
+    ]
+  }
+}
