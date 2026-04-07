@@ -2,7 +2,7 @@ import os
 import json
 from pathlib import Path
 from dotenv import load_dotenv
-
+# Se cambio el config.json para utilizar el .env
 BASE_DIR = Path(__file__).parent.resolve()
 load_dotenv(BASE_DIR / ".env")
 CONFIG_PATH = BASE_DIR / "config.json"
