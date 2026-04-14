@@ -1,241 +1,164 @@
-import json
 from datetime import datetime, timedelta
+import json
+import os
 
-def to_business_date(utc_date_str, offset_hours=-6, shift_offset=4):
-    """
-    Convierte una fecha UTC a fecha local y aplica el corte de turno restaurantero (ej. 4 AM).
-    Todo lo que ocurra desde las 00:00 hasta las 03:59 caerá en el "Día de Negocio" anterior.
-    """
-    if not utc_date_str: return ""
-    if len(utc_date_str) >= 19:
-        try:
-            clean_str = utc_date_str[:19].replace("T", " ")
-            dt = datetime.strptime(clean_str, "%Y-%m-%d %H:%M:%S")
-            # Convertir a hora local (El Salvador)
-            dt += timedelta(hours=offset_hours)
-            # Desplazar hacia atrás para lograr que la madrugada caiga "ayer"
-            dt -= timedelta(hours=shift_offset)
-            return dt.strftime("%Y-%m-%d")
-        except:
-            pass
-    return utc_date_str[:10]
+def to_business_date(date_str):
+    date_str = date_str.replace("T", " ")[:19]
+    dt = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
+    dt_local = dt - timedelta(hours=6)
+    if dt_local.hour < 4:
+        dt_local = dt_local - timedelta(days=1)
+    return dt_local.strftime("%Y-%m-%d")
 
-def generate_report(odoo, date_from, date_to, users=None, payment_methods=None, product_groups=None):
-    """
-    Se conecta al modelo pos.order de Odoo en los rangos de fechas.
-    Agrupa los ingresos por la fecha inicial de cada sesión (basado en Local Time).
-    Sub-divide los pagos de manera congruente usando pos.payment y expone remanentes.
-    """
-    domain = [
-        ("date_order", ">=", date_from),
-        ("date_order", "<=", date_to),
-        ("state", "in", ["paid", "done", "invoiced"])
-    ]
-    
-    if users:
-        domain.append(("user_id", "in", users))
-        
-    fields = [
-        "id", "name", "pos_reference", "date_order", "amount_total", "session_id", "user_id", "state", "tip_amount"
-    ]
-    
-    try:
-        orders = odoo.search("pos.order", domain, fields)
-    except Exception as e:
-        print(f"[REPORTE VENTAS] Error obteniendo datos reales: {e}")
-        orders = []
+def get_id(val):
+    if not val: return None
+    if isinstance(val, (list, tuple)) and len(val) > 0:
+        return get_id(val[0])
+    if isinstance(val, dict):
+        return val.get("id") or val.get("ID")
+    return val
 
-    # Encontrar la fecha de inicio de cada sesión basándonos en la primera orden
-    session_start_dates = {}
-    for order in orders:
-        s_id_raw = order.get("session_id")
-        if not s_id_raw:
-            continue
-        
-        # Mapeo robusto de M2O (Soporta [126, "POS"], [{"id": 126, "name": "POS"}], etc.)
-        s_id = None
-        if isinstance(s_id_raw, list) and len(s_id_raw) > 0:
-            s_id = s_id_raw[0].get("id") if isinstance(s_id_raw[0], dict) else s_id_raw[0]
-        elif isinstance(s_id_raw, dict):
-            s_id = s_id_raw.get("id")
-        else:
-            s_id = s_id_raw
+def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=None, states=None):
+    # CARGA DE MAESTROS - LOCALIZACIÓN ULTRA-ROBUSTA
+    masters = {}
+    master_locations = ["cache/masters.json", "/app/cache/masters.json", "backend/cache/masters.json"]
+    for loc in master_locations:
+        if os.path.exists(loc):
+            with open(loc, "r", encoding="utf-8") as f:
+                masters = json.load(f)
+            break
             
-        d_str = to_business_date(order.get("date_order", ""))
-        
-        if d_str and s_id:
-            if s_id not in session_start_dates:
-                session_start_dates[s_id] = d_str
-            else:
-                if d_str < session_start_dates[s_id]:
-                    session_start_dates[s_id] = d_str
+    # Mapeo de IDs (tus IDs reales sacados de masters.json)
+    user_map = {str(u["id"]): u["name"] for u in masters.get("res.users", [])}
+    payment_map = {str(p["id"]): p["name"] for p in masters.get("pos.payment.method", [])}
 
-    # Mapear pagos exactos por sesión y agrupar por fecha de pago local (para desglose nocturno)
-    session_ids = list(session_start_dates.keys())
-    session_payments = {}  # { s_id: {'total': 0.0, 'desglose': {}} }
-    metodos_raw_stats = {} # { method_name: total }
+    # 1. Órdenes
+    domain = [("date_order", ">=", date_from), ("date_order", "<=", date_to)]
+    if states: domain.append(("state", "in", states))
+    else: domain.append(("state", "!=", "cancel"))
+    if users: domain.append(("user_id", "in", [int(u) for u in users]))
 
-    if session_ids:
-        try:
-            payments = odoo.search("pos.payment", [("session_id", "in", session_ids)], ["id", "amount", "session_id", "payment_date", "payment_method_id"])
-            for p in payments:
-                s_val = p.get("session_id")
-                s_id = None
-                if isinstance(s_val, list) and len(s_val) > 0:
-                    s_id = s_val[0].get("id") if isinstance(s_val[0], dict) else s_val[0]
-                elif isinstance(s_val, dict):
-                    s_id = s_val.get("id")
-                else:
-                    s_id = s_val
-                    
-                if s_id:
-                    if s_id not in session_payments:
-                        session_payments[s_id] = {'total': 0.0, 'desglose': {}}
-                        
-                    amt = p.get("amount", 0)
-                    session_payments[s_id]['total'] += amt
-                    
-                    pm_raw = p.get("payment_method_id")
-                    pm_name = "Desconocido"
-                    if isinstance(pm_raw, list) and len(pm_raw) > 0:
-                        if isinstance(pm_raw[0], dict):
-                            pm_name = pm_raw[0].get("name", "Desconocido")
-                        elif len(pm_raw) > 1:
-                            pm_name = pm_raw[1]
-                    elif isinstance(pm_raw, dict):
-                        pm_name = pm_raw.get("name", "Desconocido")
-                    
-                    metodos_raw_stats[pm_name] = metodos_raw_stats.get(pm_name, 0) + amt
-                    
-                    pay_date_local = to_business_date(p.get("payment_date", ""))
-                    if pay_date_local:
-                        session_payments[s_id]['desglose'][pay_date_local] = session_payments[s_id]['desglose'].get(pay_date_local, 0) + amt
-                        
-        except Exception as e:
-            print(f"Error extrayendo pos.payment para congruencia: {e}")
 
-    # Diccionario para agrupar variables sumarizadas por fecha (DÍA PADRE DE LA SESIÓN)
-    summary = {}
-    usuarios_stats = {}
+    fields = ["id", "name", "date_order", "amount_total", "state", "user_id", "tip_amount", "session_id"]
+    orders = odoo.search("pos.order", domain, fields)
     
-    for order in orders:
-        s_id_raw = order.get("session_id")
-        if not s_id_raw:
-            continue
-            
-        s_id = None
-        s_name = "Sin Sesión"
-        
-        if isinstance(s_id_raw, list) and len(s_id_raw) > 0:
-            val = s_id_raw[0]
-            if isinstance(val, dict):
-                s_id = val.get("id")
-                s_name = val.get("name", f"Sesión {s_id}")
-            else:
-                s_id = val
-                s_name = s_id_raw[1] if len(s_id_raw) > 1 else f"Sesión {s_id}"
-        elif isinstance(s_id_raw, dict):
-            s_id = s_id_raw.get("id")
-            s_name = s_id_raw.get("name", f"Sesión {s_id}")
-        else:
-            s_id = s_id_raw
-            s_name = f"Sesión {s_id}"
-        
-        # Agrupamos por la fecha inicial calibrada en Local Time y Turno
-        d_str = session_start_dates.get(s_id) or to_business_date(order.get("date_order", ""))
-        
-        if not d_str:
-            continue
-            
-        if d_str not in summary:
-            summary[d_str] = {
-                "fecha": d_str,
-                "total_cuentas": 0,
-                "total_pagado": 0, 
-                "alimentos": 0,
-                "bebidas": 0,
-                "propina": 0,
-                "otros": 0,
-                "restaurante_efectivo": 0,
-                "tarjeta": 0,
-                "sesiones_dict": {}
+    if not orders: return {"status": "success", "data": [], "usuarios": [], "metodos": []}
+
+    order_ids = [o["id"] for o in orders]
+    
+    # 2. Pagos y Propinas
+    payments_records = odoo.search("pos.payment", [("pos_order_id", "in", order_ids)], ["pos_order_id", "amount", "payment_method_id"])
+    
+    tip_lines = odoo.search("pos.order.line", [("order_id", "in", order_ids), ("product_id", "=", 399)], ["order_id", "price_subtotal_incl"])
+    order_tips = {}
+    for tl in tip_lines:
+        oid = get_id(tl.get("order_id"))
+        order_tips[oid] = order_tips.get(oid, 0.0) + tl.get("price_subtotal_incl", 0.0)
+    
+    order_payments = {}
+    for p in payments_records:
+        oid = get_id(p.get("pos_order_id"))
+        order_payments[oid] = order_payments.get(oid, 0.0) + p.get("amount", 0.0)
+
+    # 3. Consolidar
+    summary_days = {}
+    summary_users = {}
+    summary_metodos = {}
+    
+    for o in orders:
+        d_bus = to_business_date(o["date_order"])
+        if d_bus not in summary_days:
+            summary_days[d_bus] = {
+                "fecha": d_bus, "total_cuentas": 0, "total_pagado": 0.0,
+                "alimentos": 0.0, "bebidas": 0.0, "propina": 0.0, "otros": 0.0,
+                "restaurante_efectivo": 0.0, "tarjeta": 0.0, "sesiones": []
             }
-            
-        summary[d_str]["total_cuentas"] += 1
         
-        total = order.get("amount_total") or 0.0
-        tip = order.get("tip_amount") or 0.0
+        o_id = o["id"]
         
-        # Agrupación por Usuario
-        u_raw = order.get("user_id")
-        u_name = "Desconocido"
-        if isinstance(u_raw, list) and len(u_raw) > 0:
-            if isinstance(u_raw[0], dict):
-                u_name = u_raw[0].get("name", "Desconocido")
-            elif len(u_raw) > 1:
-                u_name = u_raw[1]
-        elif isinstance(u_raw, dict):
-            u_name = u_raw.get("name", "Desconocido")
-        if u_name not in usuarios_stats:
-            usuarios_stats[u_name] = {"nombre": u_name, "ventas": 0, "cuentas": 0}
-        usuarios_stats[u_name]["ventas"] += total
-        usuarios_stats[u_name]["cuentas"] += 1
+        o_pays = [p for p in payments_records if get_id(p.get("pos_order_id")) == o_id]
+        if payments:
+            str_payments = [str(x) for x in payments]
+            o_pays = [p for p in o_pays if str(get_id(p.get("payment_method_id"))) in str_payments]
+            if not o_pays:
+                continue
+
+        o_total = sum(p.get("amount", 0.0) for p in o_pays) if payments else order_payments.get(o_id, o.get("amount_total", 0.0))
+        o_tip = order_tips.get(o_id, o.get("tip_amount", 0.0))
+        if o_total < o_tip and payments:
+            o_tip = o_total
         
-        # Sub-agrupación por sesión e inyección del desglose de pos.payment
-        if s_id not in summary[d_str]["sesiones_dict"]:
-            sp = session_payments.get(s_id, {'total': 0.0, 'desglose': {}})
-            real_payment = sp['total']
-            desglose_dict = sp['desglose']
-            
-            desglose_arr = [{"fecha": k, "monto": v} for k, v in sorted(desglose_dict.items())]
-            
-            summary[d_str]["sesiones_dict"][s_id] = {
+        summary_days[d_bus]["total_cuentas"] += 1
+        summary_days[d_bus]["total_pagado"] += o_total
+        summary_days[d_bus]["propina"] += o_tip
+        summary_days[d_bus]["alimentos"] += (o_total - o_tip) * 0.7
+        summary_days[d_bus]["bebidas"] += (o_total - o_tip) * 0.3
+        
+        # CLASIFICACIÓN BASADA EN TUS IDs REALES
+        if not o_pays and not payments:
+             summary_days[d_bus]["restaurante_efectivo"] += o_total
+             # Metodos Global
+             pm_name = "Efectivo"
+             summary_metodos[pm_name] = summary_metodos.get(pm_name, 0.0) + o_total
+        else:
+            for pr in o_pays:
+                pm_id = str(get_id(pr.get("payment_method_id")))
+                pm_name = payment_map.get(pm_id, f"Metodo {pm_id}")
+                pm_amount = pr.get("amount", 0.0)
+                # Global
+                summary_metodos[pm_name] = summary_metodos.get(pm_name, 0.0) + pm_amount
+                
+                # REGLA ORO HERRADURA: ID 2 es Tarjeta. Lo demás es Efectivo/Caja.
+                if pm_id == "2":
+                    summary_days[d_bus]["tarjeta"] += pm_amount
+                else:
+                    summary_days[d_bus]["restaurante_efectivo"] += pm_amount
+
+        # USUARIOS
+        uid_str = str(get_id(o.get("user_id")))
+        u_name = user_map.get(uid_str) or (o.get("user_id")[1] if isinstance(o.get("user_id"), list) else "Cajero General")
+        if u_name not in summary_users:
+            summary_users[u_name] = {"nombre": u_name, "cuentas": 0, "ventas": 0.0}
+        summary_users[u_name]["cuentas"] += 1
+        summary_users[u_name]["ventas"] += o_total
+
+        # SESIONES
+        s_val = o.get("session_id")
+        s_id = get_id(s_val) or 0
+        raw_name = s_val[1] if isinstance(s_val, list) and len(s_val) > 1 else str(s_id)
+        s_name = f'SESION "{raw_name}"'
+        
+        session_idx = next((i for i, s in enumerate(summary_days[d_bus]["sesiones"]) if s["id"] == s_id), -1)
+        if session_idx == -1:
+            summary_days[d_bus]["sesiones"].append({
                 "id": s_id,
                 "name": s_name,
                 "total_cuentas": 0,
-                "total_pagado": real_payment,
-                "desglose": desglose_arr,
+                "total_pagado": 0.0,
+                "propina": 0.0,
+                "desglose": [],
                 "cuentas": []
-            }
-            # Sumamos al día el bloque completo de la sesión una sola vez
-            summary[d_str]["total_pagado"] += real_payment
+            })
+            session_idx = len(summary_days[d_bus]["sesiones"]) - 1
             
-        summary[d_str]["sesiones_dict"][s_id]["total_cuentas"] += 1
-        
-        # Guardar el detalle de la cuenta
-        summary[d_str]["sesiones_dict"][s_id]["cuentas"].append({
-            "id": order.get("id"),
-            "nombre": order.get("pos_reference") or order.get("name") or f"Orden {order.get('id')}",
-            "total": total,
-            "propina": tip,
-            "estado": order.get("state", "Desconocido")
+        summary_days[d_bus]["sesiones"][session_idx]["total_cuentas"] += 1
+        summary_days[d_bus]["sesiones"][session_idx]["total_pagado"] += o_total
+        summary_days[d_bus]["sesiones"][session_idx]["propina"] += o_tip
+        summary_days[d_bus]["sesiones"][session_idx]["cuentas"].append({
+            "id": o_id,
+            "nombre": o["name"],
+            "propina": o_tip,
+            "total": o_total,
+            "estado": o.get("state")
         })
-        
-        summary[d_str]["propina"] += tip
-        
-        gastable = total - tip
-        
-        summary[d_str]["alimentos"] += gastable * 0.70
-        summary[d_str]["bebidas"] += gastable * 0.25
-        summary[d_str]["otros"] += gastable * 0.05
-        
-        summary[d_str]["restaurante_efectivo"] += total * 0.35
-        summary[d_str]["tarjeta"] += total * 0.65
-        
-    results = []
-    for k, v in sorted(summary.items()):
-        v["sesiones"] = list(v["sesiones_dict"].values())
-        del v["sesiones_dict"]
-        results.append(v)
-        
-    # Formatear array de usuarios
-    usuarios_arr = [{"nombre": v["nombre"], "ventas": v["ventas"], "cuentas": v["cuentas"]} for k,v in sorted(usuarios_stats.items(), key=lambda item: item[1]["ventas"], reverse=True)]
-    
-    # Formatear array de metodos
-    metodos_arr = [{"metodo": k, "monto": v} for k, v in sorted(metodos_raw_stats.items(), key=lambda item: item[1], reverse=True)]
+
+    # Formatear respuesta
+    report_list = sorted(list(summary_days.values()), key=lambda x: x["fecha"])
+    usuarios_list = sorted(list(summary_users.values()), key=lambda x: x["ventas"], reverse=True)
     
     return {
-        "data": results,
-        "usuarios": usuarios_arr,
-        "metodos": metodos_arr
+        "status": "success",
+        "data": report_list,
+        "usuarios": usuarios_list,
+        "metodos": [{"metodo": k, "monto": v} for k, v in summary_metodos.items()]
     }

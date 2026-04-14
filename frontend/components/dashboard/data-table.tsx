@@ -94,6 +94,7 @@ export function DataTable({ data }: DataTableProps) {
                                                                  <tr className="text-muted-foreground border-b border-slate-700">
                                                                     <th className="pb-2 text-left font-medium">Nombre de la Sesión</th>
                                                                     <th className="pb-2 text-center font-medium">Cuentas</th>
+                                                                    <th className="pb-2 text-right font-medium">Propina</th>
                                                                     <th className="pb-2 text-right font-medium">Total Pagado</th>
                                                                 </tr>
                                                             </thead>
@@ -114,6 +115,7 @@ export function DataTable({ data }: DataTableProps) {
                                                                                 {session.name}
                                                                             </td>
                                                                             <td className="py-3 text-center text-slate-400">{session.total_cuentas}</td>
+                                                                            <td className="py-3 text-right text-emerald-500/80 font-medium">{formatCurrency(session.propina)}</td>
                                                                             <td className="py-3 text-right font-semibold text-emerald-400">
                                                                                 {!session.desglose || session.desglose.length <= 1 ? (
                                                                                     <OdooTooltip model="pos.payment" field="amount" filter="Contexto: {}, Obligatorio: True" className="inline-block cursor-help">
@@ -131,7 +133,7 @@ export function DataTable({ data }: DataTableProps) {
                                                                         </tr>
                                                                         {expandedSessions[session.id] && (
                                                                             <tr>
-                                                                                <td colSpan={3} className="p-0">
+                                                                                <td colSpan={4} className="p-0">
                                                                                     <div className="bg-slate-900/80 my-2 rounded-lg border border-slate-700/30 overflow-hidden mx-4 pb-2">
                                                                                         {!session.cuentas || session.cuentas.length === 0 ? (
                                                                                             <div className="py-6 text-center text-slate-500 animate-pulse">
@@ -189,4 +191,3 @@ export function DataTable({ data }: DataTableProps) {
         </Card>
     )
 }
-

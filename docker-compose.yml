@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dashboard-backend
+    restart: always
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend/cache:/app/cache
+      - ./backend/reports:/app/reports
+    env_file:
+      - ./backend/.env
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: dashboard-frontend
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      # Ahora las peticiones irán a través de Caddy en la misma IP
+      - NEXT_PUBLIC_API_URL=/api
+    depends_on:
+      - backend

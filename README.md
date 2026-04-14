@@ -1,68 +1,67 @@
-# Dashboard BI Analytics
+# Dashboard BI Analytics - Herradura Odoo Integration
 
-Este proyecto es un dashboard interactivo diseñado para mostrar inteligencia de negocios (BI). Está dividido en dos partes principales: un **backend** en Python y un **frontend** desarrollado con React y Next.js.
+Este proyecto es un robusto ecosistema de Inteligencia de Negocios (BI) diseñado para extraer, procesar y visualizar métricas críticas de ventas desde Odoo ERP en tiempo real. Está optimizado para el control operativo de restaurantes y puntos de venta (POS).
 
-## Arquitectura del Proyecto
+## 🚀 Innovaciones y Funcionalidades Recientes
 
-Tras la reestructuración, la arquitectura del proyecto quedó dividida en dos módulos lógicos para mejorar la mantenibilidad y organización:
+### 1. Navegación Inteligente y Pestañas de Análisis
+El dashboard ahora cuenta con un sistema de navegación dual que separa la operación diaria del análisis estratégico:
+- **Dashboard General**: Una vista limpia y minimalista filtrada por fechas para observar el rendimiento global del negocio.
+- **Análisis Avanzado**: Un entorno de filtros matemáticos profundos donde los usuarios pueden segmentar por **Cajeros/Vendedores**, **Métodos de Pago** y **Estado de Venta**.
 
-### 1. `backend/` (Flask API)
-El backend es una API REST responsable de autenticar usuarios contra un sistema ERP (Odoo), autorizaciones (comprobar el acceso a Dashboard) y recopilar y devolver los reportes.
-- **`bi_service.py`**: El punto de entrada de la aplicación Flask. Configura JWT (JSON Web Tokens) para las sesiones y expone las rutas REST `/api/auth/login`, `/api/bi/masters` y `/api/bi/report/ventas`.
-- **`config.py` y `config.json`**: Sistema de configuraciones, usado para mantener las credenciales y rutas.
-- **`core/`**: Carpeta para lógicas compartidas:
-  - `odoo_client.py`: Contiene la clase `OdooClient` que abstrae las peticiones hacia el Odoo externo.
-  - `security.py`: Capa de seguridad, que revisa el permiso de acceso.
-  - `utils.py`: Herramientas de cifrado MD5 limitadas y dependencias simples.
-- **`cache/`**: Archivos estáticos `.json` donde se guardan temporalmente los resultados de los reportes.
-- *(Nota)* Ocasionalmente se buscarán librerías externas o conectas de reportes (como `reporte_ventas`).
+### 2. Filtros Matemáticos Reales (Backend Driven)
+A diferencia de otros dashboards, los filtros aquí no son solo visuales. El backend en Python procesa cada selección para recalcular:
+- **Filtrado de Usuarios**: Exclusión total de montos y transacciones de usuarios no seleccionados en el `domain` de búsqueda.
+- **Filtrado de Pagos**: Desglose exacto de pagos mixtos (Efectivo vs. Tarjeta) en el cálculo de totales cuando se aplican filtros de método de pago. Si eliges "Solo Efectivo", el reporte restará automáticamente lo cobrado por terminal.
 
-### 2. `frontend/` (Next.js Application)
-El frontend proporciona la interfaz de usuario interactiva y fluída.
-- **`app/`**: Sistema de routing o 'App Router'.
-  - `app/login/`: Iniciar sesión.
-  - `app/dashboard/`: Tablero interactivo; el componente invocado y visualizado final reside en `page.tsx`.
-- **`components/ui/`**: Componentes básicos y primitivos en Tailwind (botones, contenedores Card, inputs).
-- **`components/dashboard/`**: Las piezas del lienzo: `charts-section`, `data-table`, `filters-section`, y `stats-cards`.
-- **`lib/`**: Archivos núcleo para solicitudes.
-  - `api.ts`: Controlador con Axios.
-  - `types.ts`: TypeScript que describe las bases de datos.
+### 3. Motor de Propinas de Alta Precisión
+Se implementó un motor de búsqueda profunda en las líneas de pedido de Odoo para identificar el producto **"Propina" (ID 399)**. Esto soluciona la falta de datos en el campo estándar de Odoo, devolviendo sumatorias exactas de propina captada por sesión, por día y por cuenta individual.
+
+### 4. Jerarquía de Datos: Jornadas y Sesiones
+El reporte agrupa la información siguiendo la lógica de negocio real:
+- **Jornada Laboral (Turno 4AM - 4AM)**: Agrupación administrativa por día contable para cuadrar con el cierre de restaurante.
+- **Sesiones de Odoo**: Identificación de cada apertura y cierre de caja (`pos.session`) dentro de un día.
+- **Desglose de Cuentas**: Acceso granular a cada ticket individual (`pos.order`), su estado (Pagado/Facturado) y la propina específica generada en ese servicio.
+
+## 🛠️ Arquitectura Técnica
+
+### Backend (Python / Flask)
+API REST encargada de la lógica pesada y conectividad segura:
+- **`bi_service.py`**: Servidor Flask con seguridad JWT.
+- **`reports/reporte_ventas.py`**: El cerebro del sistema. Realiza consultas optimizadas a Odoo y consolida la jerarquía Días -> Sesiones -> Pedidos. Incorpora lógica de nombres dinámicos: *SESION "Nombre_de_Sesion"*.
+- **`cache/`**: Sistema de almacenamiento local para respuestas rápidas y reducción de carga en el servidor Odoo.
+
+### Frontend (Next.js / Tailwind CSS / Lucide)
+Interfaz premium con enfoque en UX:
+- **Diseño Moderno**: Uso de tarjetas de métricas con iconos dinámicos y estados de color (Efectivo en azul, Tarjeta en púrpura, Propina en ámbar).
+- **Componentes React**:
+  - `StatsCards`: Resumen ejecutivo de 5 métricas clave, incluyendo Propina como métrica primaria.
+  - `DataTable`: Visualización jerárquica con filas expandibles para sesiones y cuentas con desglose de propinas.
+  - `FiltersSection`: Selector inteligente de Mes, Año o día exacto.
+
+## 📊 Variables Críticas del Reporte
+
+| Variable | Descripción |
+| :--- | :--- |
+| `total_pagado` | Ingreso neto total procesado en el periodo. |
+| `propina` | Calculada mediante la sumatoria del Producto ID 399 en `pos.order.line`. |
+| `total_cuentas` | Conteo de tickets de venta generados (excluyendo cancelaciones). |
+| `restaurante_efectivo` | Suma de montos captados en efectivo (Excluye método de pago ID 2). |
+| `tarjeta` | Suma de montos captados mediante terminales bancarias (Método de pago ID 2). |
+
+## ⚙️ Ejecución del Proyecto
+
+### Desarrollo Local
+1.  **Backend**: `cd backend && python bi_service.py` (Puerto 5000).
+2.  **Frontend**: `cd frontend && npm run dev` (Puerto 3000).
+
+*Nota: Asegúrate de tener configurado el archivo `.env` en la carpeta `backend` con las credenciales de Odoo y `DEV_MODE=True` para omitir login en pruebas.*
+
+### Producción (Docker)
+Levanta todo el stack con un solo comando:
+```bash
+docker-compose up -d --build
+```
 
 ---
-
-## Las Variables en el Dashboard (Ejemplo)
-
-Una de las características más importantes de este dashboard es que su formato de retorno al frontend es estricto en su tipado, permitiendo que la interfaz de usuario siempre sepa qué datos le corresponden a qué sección.  
-En el código fuente de Typescript (`frontend/lib/types.ts`) se definen las siguientes variables críticas que componen una fila de reporte y que verás desplegadas en la pantalla:
-
-| Variable | Tipo | Descripción |
-| :--- | :--- | :--- |
-| `fecha` | `string` | La fecha correspondiente al corte actual del reporte. |
-| `total_cuentas` | `number` | La cantidad de comandas, recibos o cuentas finalizadas. |
-| `total_pagado` | `number` | Es el gran ingreso total sumado de la fecha respectiva. |
-| `alimentos` | `number` | El sub-total de venta en productos clasificados como comida. |
-| `bebidas` | `number` | El sub-total de ingresos procedentes de ventas líquidas ("bebidas"). |
-| `propina` | `number` | Excedente o aportaciones libres captadas en propinas. |
-| `otros` | `number` | Variables monetarias ajenas a propinas o alimenticios. |
-| `restaurante_efectivo` | `number` | Método de pago en dinero físico reportado para la caja registradora. |
-| `tarjeta` | `number` | Método de pago virtual o por TPV (Terminal Punto de Venta). |
-
-En cuanto tu servidor compila la vista, herramientas como la interfaz de `charts-section.tsx` mapean estas variables contra un plano cartesiano (eje de tiempo para **fecha**, eje Y para métricas como **total\_pagado**) y las dibujan a color de forma automatizada sobre la tabla.
-
-## Cómo Ejecutar el Proyecto
-Para mantener la autonomía, aquí te decimos cómo levantar ambos entes por separado.
-
-**Para el Backend:**
-```bash
-cd backend
-python bi_service.py
-```
-*(El servidor escuchará por defecto en el puerto `5005` y provee tokens JWT y un modo de desarrollo)*
-
-**Para el Frontend:**
-```bash
-cd frontend
-npm install
-npm run dev
-```
-*(Estará disponible en http://localhost:3000)*
+*Este proyecto transforma datos crudos de Odoo en decisiones estratégicas inteligentes.*

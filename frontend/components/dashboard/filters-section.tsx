@@ -1,43 +1,53 @@
 import { useState, useRef, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
-import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Search, Loader2, Calendar, Users, CreditCard, Layers, ChevronDown } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Search, Loader2, Calendar, Users, CreditCard, Layers, ChevronDown, Filter, Target } from 'lucide-react'
 import type { Masters } from '@/lib/types'
 
 interface FiltersSectionProps {
+    viewMode?: 'main' | 'advanced'
     dateFrom: string
     dateTo: string
     selectedUsers: number[]
     selectedPayments: number[]
     selectedProductGroups: string[]
+    selectedStates: string[]
     masters: Masters | undefined
+    odooStates: { id: string, name: string }[]
     onDateFromChange: (date: string) => void
     onDateToChange: (date: string) => void
     onUsersChange: (users: number[]) => void
     onPaymentsChange: (payments: number[]) => void
     onProductGroupsChange: (groups: string[]) => void
+    onStatesChange: (states: string[]) => void
     onFetchReport: () => void
     isLoading: boolean
 }
 
 export function FiltersSection({
+    viewMode = 'main',
     dateFrom,
     dateTo,
     selectedUsers,
     selectedPayments,
     selectedProductGroups,
+    selectedStates,
     masters,
+    odooStates,
     onDateFromChange,
     onDateToChange,
     onUsersChange,
     onPaymentsChange,
     onProductGroupsChange,
+    onStatesChange,
     onFetchReport,
     isLoading,
 }: FiltersSectionProps) {
     const [openDropdown, setOpenDropdown] = useState<string | null>(null)
+    const [queryMode, setQueryMode] = useState<'day' | 'month' | 'year'>('month')
+    const [selectedYear, setSelectedYear] = useState('2026')
     const dropdownRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
@@ -50,215 +60,191 @@ export function FiltersSection({
         return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [])
 
-    const handleUserSelect = (userId: number) => {
-        if (selectedUsers.includes(userId)) {
-            onUsersChange(selectedUsers.filter(id => id !== userId))
-        } else {
-            onUsersChange([...selectedUsers, userId])
-        }
-    }
-
-    const handlePaymentSelect = (pmId: number) => {
-        if (selectedPayments.includes(pmId)) {
-            onPaymentsChange(selectedPayments.filter(id => id !== pmId))
-        } else {
-            onPaymentsChange([...selectedPayments, pmId])
-        }
-    }
-
-    const handleProductGroupSelect = (group: string) => {
-        if (selectedProductGroups.includes(group)) {
-            onProductGroupsChange(selectedProductGroups.filter(g => g !== group))
-        } else {
-            onProductGroupsChange([...selectedProductGroups, group])
-        }
-    }
-
     const toggleDropdown = (name: string) => {
         setOpenDropdown(openDropdown === name ? null : name)
     }
 
-    // Mapping for product groups to readable names
-    const productGroupLabels: Record<string, string> = {
-        'food': 'Alimentos',
-        'drink': 'Bebidas',
-        'tip': 'Propina',
-        'other': 'Otros'
+    const years = ['2024', '2025', '2026']
+    const modes = [
+        { id: 'day', name: 'Día Específico', icon: Target },
+        { id: 'month', name: 'Mes Completo', icon: Calendar },
+        { id: 'year', name: 'Año Completo', icon: Layers }
+    ]
+
+    const months = [
+        { id: '01', name: 'Enero' }, { id: '02', name: 'Febrero' }, { id: '03', name: 'Marzo' },
+        { id: '04', name: 'Abril' }, { id: '05', name: 'Mayo' }, { id: '06', name: 'Junio' },
+        { id: '07', name: 'Julio' }, { id: '08', name: 'Agosto' }, { id: '09', name: 'Septiembre' },
+        { id: '10', name: 'Octubre' }, { id: '11', name: 'Noviembre' }, { id: '12', name: 'Diciembre' }
+    ]
+
+    const handleSmartChange = (mode: 'day' | 'month' | 'year', value: string) => {
+        if (mode === 'year') {
+            onDateFromChange(`${value}-01-01`)
+            onDateToChange(`${value}-12-31`)
+        } else if (mode === 'month') {
+            const lastDay = new Date(parseInt(selectedYear), parseInt(value), 0).getDate()
+            onDateFromChange(`${selectedYear}-${value}-01`)
+            onDateToChange(`${selectedYear}-${value}-${lastDay}`)
+        } else if (mode === 'day') {
+            onDateFromChange(value)
+            onDateToChange(value)
+        }
     }
 
-    const productGroups = ['food', 'drink', 'tip', 'other']
+    // Nombre del mes basado en la fecha dateFrom
+    const currentMonthNum = dateFrom.split('-')[1]
+    const currentMonthName = months.find(m => m.id === currentMonthNum)?.name
 
     return (
-        <Card className="border-2 shadow-lg bg-card">
-            <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2 text-primary">
-                    <Search className="h-5 w-5" />
-                    Filtros de Búsqueda
-                </CardTitle>
-            </CardHeader>
-            <CardContent>
+        <Card className="border-2 shadow-2xl bg-card border-primary/20 overflow-visible">
+            <CardContent className="p-5">
                 <div className="flex flex-col gap-6" ref={dropdownRef}>
-                    {/* First Row: Dates */}
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="space-y-2">
-                            <Label htmlFor="date-from" className="flex items-center gap-2 text-card-foreground/80 font-semibold">
-                                <Calendar className="h-4 w-4 text-primary" />
-                                Desde
-                            </Label>
-                            <Input
-                                id="date-from"
-                                type="date"
-                                value={dateFrom}
-                                onChange={(e) => onDateFromChange(e.target.value)}
-                                className="bg-background border-input focus:ring-primary h-10"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="date-to" className="flex items-center gap-2 text-card-foreground/80 font-semibold">
-                                <Calendar className="h-4 w-4 text-primary" />
-                                Hasta
-                            </Label>
-                            <Input
-                                id="date-to"
-                                type="date"
-                                value={dateTo}
-                                onChange={(e) => onDateToChange(e.target.value)}
-                                className="bg-background border-input focus:ring-primary h-10"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Second Row: Selectors and Button */}
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 items-end">
-                        {/* Users Selector */}
-                        <div className="space-y-2 relative">
-                            <Label className="flex items-center gap-2 text-card-foreground/80 font-semibold">
-                                <Users className="h-4 w-4 text-primary" />
-                                Usuarios ({selectedUsers.length})
-                            </Label>
-                            <div
-                                onClick={() => toggleDropdown('users')}
-                                className="flex h-10 w-full cursor-pointer items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm transition-all hover:border-primary hover:bg-muted/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                            >
-                                <span className="truncate max-w-[150px]">
-                                    {selectedUsers.length > 0 ? `${selectedUsers.length} seleccionados` : 'Todos los Usuarios'}
+                    
+                    {/* FILA 1: SELECTORES RÁPIDOS */}
+                    <div className="grid grid-cols-1 md:grid-cols-10 gap-4 items-end">
+                        
+                        {/* 1. MODO */}
+                        <div className="md:col-span-2 space-y-1.5 relative text-left">
+                            <Label className="text-[10px] uppercase font-bold text-primary tracking-widest pl-1">Consulta por</Label>
+                            <div onClick={() => toggleDropdown('mode')} className="flex h-10 w-full cursor-pointer items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-xs hover:border-primary transition-all">
+                                <span className="font-semibold flex items-center gap-2">
+                                    {modes.find(m => m.id === queryMode)?.name}
                                 </span>
-                                <ChevronDown className={`h-4 w-4 transition-transform ${openDropdown === 'users' ? 'rotate-180' : ''} opacity-60`} />
+                                <ChevronDown className="h-3 w-3" />
                             </div>
-                            {openDropdown === 'users' && (
-                                <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border border-border bg-popover p-1 shadow-xl animate-in fade-in slide-in-from-top-1 duration-150">
-                                    {masters?.['res.users']?.map((user) => (
-                                        <label key={user.id} className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 hover:bg-accent hover:text-accent-foreground text-sm transition-colors group">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedUsers.includes(user.id)}
-                                                onChange={(e) => {
-                                                    e.stopPropagation();
-                                                    handleUserSelect(user.id);
-                                                }}
-                                                className="h-4 w-4 rounded border-input text-primary focus:ring-primary/20 cursor-pointer"
-                                            />
-                                            <span className="truncate group-hover:font-medium">{user.name}</span>
-                                        </label>
+                            {openDropdown === 'mode' && (
+                                <div className="absolute z-[70] mt-1 w-full bg-popover border border-border rounded-md shadow-2xl p-1">
+                                    {modes.map(m => (
+                                        <div key={m.id} onClick={() => { setQueryMode(m.id as any); setOpenDropdown(null); }} className="px-3 py-2 text-xs hover:bg-primary/10 rounded cursor-pointer">{m.name}</div>
                                     ))}
                                 </div>
                             )}
                         </div>
 
-                        {/* Payment Methods Selector */}
-                        <div className="space-y-2 relative">
-                            <Label className="flex items-center gap-2 text-card-foreground/80 font-semibold">
-                                <CreditCard className="h-4 w-4 text-primary" />
-                                Método Pago ({selectedPayments.length})
-                            </Label>
-                            <div
-                                onClick={() => toggleDropdown('payments')}
-                                className="flex h-10 w-full cursor-pointer items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm transition-all hover:border-primary hover:bg-muted/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                            >
-                                <span className="truncate max-w-[150px]">
-                                    {selectedPayments.length > 0 ? `${selectedPayments.length} seleccionados` : 'Todos los Métodos'}
-                                </span>
-                                <ChevronDown className={`h-4 w-4 transition-transform ${openDropdown === 'payments' ? 'rotate-180' : ''} opacity-60`} />
+                        {/* 2. AÑO */}
+                        <div className="md:col-span-1 space-y-1.5 relative text-left">
+                            <Label className="text-[10px] uppercase font-bold text-primary tracking-widest pl-1">Año</Label>
+                            <div onClick={() => toggleDropdown('year')} className="flex h-10 w-full cursor-pointer items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-xs hover:border-primary transition-all">
+                                <span className="font-bold">{selectedYear}</span>
+                                <ChevronDown className="h-3 w-3" />
                             </div>
-                            {openDropdown === 'payments' && (
-                                <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border border-border bg-popover p-1 shadow-xl animate-in fade-in slide-in-from-top-1 duration-150">
-                                    {masters?.['pos.payment.method']?.map((pm) => (
-                                        <label key={pm.id} className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 hover:bg-accent hover:text-accent-foreground text-sm transition-colors group">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedPayments.includes(pm.id)}
-                                                onChange={(e) => {
-                                                    e.stopPropagation();
-                                                    handlePaymentSelect(pm.id);
-                                                }}
-                                                className="h-4 w-4 rounded border-input text-primary focus:ring-primary/20 cursor-pointer"
-                                            />
-                                            <span className="truncate group-hover:font-medium">{pm.name}</span>
-                                        </label>
+                            {openDropdown === 'year' && (
+                                <div className="absolute z-[70] mt-1 w-full bg-popover border border-border rounded-md shadow-2xl p-1">
+                                    {years.map(y => (
+                                        <div key={y} onClick={() => { setSelectedYear(y); if (queryMode === 'year') handleSmartChange('year', y); setOpenDropdown(null); }} className="px-3 py-2 text-xs hover:bg-primary/10 rounded cursor-pointer">{y}</div>
                                     ))}
                                 </div>
                             )}
                         </div>
 
-                        {/* Product Groups Selector */}
-                        <div className="space-y-2 relative">
-                            <Label className="flex items-center gap-2 text-card-foreground/80 font-semibold">
-                                <Layers className="h-4 w-4 text-primary" />
-                                Categoría ({selectedProductGroups.length})
-                            </Label>
-                            <div
-                                onClick={() => toggleDropdown('groups')}
-                                className="flex h-10 w-full cursor-pointer items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm transition-all hover:border-primary hover:bg-muted/30 focus:outline-none focus:ring-2 focus:ring-primary/20"
-                            >
-                                <span className="truncate max-w-[150px]">
-                                    {selectedProductGroups.length > 0 ? `${selectedProductGroups.length} seleccionadas` : 'Todas las Categorías'}
-                                </span>
-                                <ChevronDown className={`h-4 w-4 transition-transform ${openDropdown === 'groups' ? 'rotate-180' : ''} opacity-60`} />
-                            </div>
-                            {openDropdown === 'groups' && (
-                                <div className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md border border-border bg-popover p-1 shadow-xl animate-in fade-in slide-in-from-top-1 duration-150">
-                                    {productGroups.map((group) => (
-                                        <label key={group} className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 hover:bg-accent hover:text-accent-foreground text-sm transition-colors group">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedProductGroups.includes(group)}
-                                                onChange={(e) => {
-                                                    e.stopPropagation();
-                                                    handleProductGroupSelect(group);
-                                                }}
-                                                className="h-4 w-4 rounded border-input text-primary focus:ring-primary/20 cursor-pointer"
-                                            />
-                                            <span className="truncate group-hover:font-medium">{productGroupLabels[group] || group}</span>
-                                        </label>
-                                    ))}
-                                </div>
+                        {/* 3. DINAMICO (MES O DIA) */}
+                        <div className="md:col-span-3 space-y-1.5 relative text-left">
+                            {queryMode === 'month' && (
+                                <>
+                                    <Label className="text-[10px] uppercase font-bold text-primary tracking-widest pl-1">Mes a evaluar</Label>
+                                    <div onClick={() => toggleDropdown('month')} className="flex h-10 w-full cursor-pointer items-center justify-between rounded-md border-2 border-primary bg-primary/5 px-3 py-2 text-xs hover:shadow-[0_0_15px_rgba(239,68,68,0.2)] transition-all">
+                                        <span className="font-black text-primary text-sm uppercase">
+                                            {currentMonthName ? `${currentMonthName} ${selectedYear}` : '--- SELECCIONA MES ---'}
+                                        </span>
+                                        <ChevronDown className="h-4 w-4 text-primary" />
+                                    </div>
+                                    {openDropdown === 'month' && (
+                                        <div className="absolute z-[70] mt-1 w-full grid grid-cols-4 gap-1 bg-popover border border-border rounded-md shadow-2xl p-2">
+                                            {months.map(m => (
+                                                <div key={m.id} onClick={() => { handleSmartChange('month', m.id); setOpenDropdown(null); }} className={`px-2 py-3 text-[9px] text-center rounded transition-all cursor-pointer border border-border/40 font-bold ${currentMonthNum === m.id ? 'bg-primary text-white' : 'hover:bg-primary/10'}`}>{m.name.toUpperCase()}</div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                            {queryMode === 'day' && (
+                                <>
+                                    <Label className="text-[10px] uppercase font-bold text-primary tracking-widest pl-1">Día Específico</Label>
+                                    <Input type="date" value={dateFrom} onChange={(e) => handleSmartChange('day', e.target.value)} className="h-10 text-xs font-bold border-primary" />
+                                </>
+                            )}
+                             {queryMode === 'year' && (
+                                <>
+                                    <Label className="text-[10px] uppercase font-bold text-primary tracking-widest pl-1">Reporte Anual</Label>
+                                    <div className="h-10 flex items-center px-3 bg-primary/20 border border-primary/30 rounded text-[10px] font-black italic text-primary">TODO EL AÑO {selectedYear} SELECCIONADO</div>
+                                </>
                             )}
                         </div>
 
-                        {/* Search Button */}
-                        <div className="flex items-end h-10 mt-6 lg:mt-0">
-                            <Button
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    onFetchReport();
-                                }}
-                                disabled={isLoading}
-                                className="w-full h-10 bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-lg transition-all active:scale-95 disabled:opacity-50"
-                            >
-                                {isLoading ? (
-                                    <>
-                                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                                        Calculando...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Search className="mr-2 h-5 w-5" />
-                                        CONSULTAR
-                                    </>
-                                )}
+                        {/* 4. BOTON CONSULTAR */}
+                        <div className="md:col-span-4 pl-4 pt-1 items-end flex h-10 w-full">
+                            <Button onClick={(e) => { e.preventDefault(); onFetchReport(); }} disabled={isLoading} className="w-full h-full bg-primary hover:bg-primary/90 text-white font-black rounded shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-2 text-sm italic tracking-widest uppercase">
+                                {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <><Search className="h-5 w-5" /> Consultar Reporte</>}
                             </Button>
                         </div>
                     </div>
+
+                    {/* FILA 2: FILTROS AVANZADOS (DROPDOWNS) */}
+                    {viewMode === 'advanced' && (
+                        <>
+                            <div className="h-px w-full bg-border/40" />
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-left">
+                                <div className="space-y-1.5 relative">
+                                    <Label className="text-[9px] uppercase font-bold text-muted-foreground tracking-widest pl-1">Usuarios / Cajeros</Label>
+                                    <div onClick={() => toggleDropdown('users')} className={`flex h-9 w-full cursor-pointer items-center justify-between rounded border px-3 py-2 text-[10px] ${selectedUsers.length > 0 ? 'border-primary bg-primary/5' : 'bg-background'}`}>
+                                        <span className="truncate">{selectedUsers.length > 0 ? `${selectedUsers.length} Seleccionados` : 'Todos los Usuarios'}</span>
+                                        <ChevronDown className="h-3 w-3 opacity-50" />
+                                    </div>
+                                    {openDropdown === 'users' && (
+                                        <div className="absolute z-50 mt-1 max-h-48 w-60 overflow-auto rounded border bg-popover p-1 shadow-2xl">
+                                            {masters?.['res.users']?.map(user => (
+                                                <label key={user.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 hover:bg-accent text-[10px]">
+                                                    <input type="checkbox" checked={selectedUsers.includes(user.id)} onChange={() => onUsersChange(selectedUsers.includes(user.id) ? selectedUsers.filter(id => id !== user.id) : [...selectedUsers, user.id])} className="h-3 w-3" />
+                                                    <span className="truncate">{user.name}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="space-y-1.5 relative">
+                                    <Label className="text-[9px] uppercase font-bold text-muted-foreground tracking-widest pl-1">Métodos de Pago</Label>
+                                    <div onClick={() => toggleDropdown('payments')} className={`flex h-9 w-full cursor-pointer items-center justify-between rounded border px-3 py-2 text-[10px] ${selectedPayments.length > 0 ? 'border-primary bg-primary/5' : 'bg-background'}`}>
+                                        <span className="truncate">{selectedPayments.length > 0 ? `${selectedPayments.length} Seleccionados` : 'Filtro de Pago'}</span>
+                                        <ChevronDown className="h-3 w-3 opacity-50" />
+                                    </div>
+                                    {openDropdown === 'payments' && (
+                                        <div className="absolute z-50 mt-1 max-h-48 w-56 overflow-auto rounded border bg-popover p-1 shadow-2xl">
+                                            {masters?.['pos.payment.method']?.map(pm => (
+                                                <label key={pm.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 hover:bg-accent text-[10px]">
+                                                    <input type="checkbox" checked={selectedPayments.includes(pm.id)} onChange={() => onPaymentsChange(selectedPayments.includes(pm.id) ? selectedPayments.filter(id => id !== pm.id) : [...selectedPayments, pm.id])} className="h-3 w-3" />
+                                                    <span className="truncate">{pm.name}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="space-y-1.5 relative">
+                                    <Label className="text-[9px] uppercase font-bold text-muted-foreground tracking-widest pl-1">Estado de Venta</Label>
+                                    <div onClick={() => toggleDropdown('states')} className={`flex h-9 w-full cursor-pointer items-center justify-between rounded border px-3 py-2 text-[10px] ${selectedStates.length > 0 ? 'border-blue-500 bg-blue-500/5' : 'bg-background'}`}>
+                                        <span className="truncate">{selectedStates.length > 0 ? `Ventas: (${selectedStates.length})` : 'Ventas OK'}</span>
+                                        <ChevronDown className="h-3 w-3 opacity-50" />
+                                    </div>
+                                    {openDropdown === 'states' && (
+                                        <div className="absolute z-50 mt-1 w-48 bg-popover border border-border rounded shadow-2xl p-1 right-0 lg:left-0 text-[10px]">
+                                            {odooStates.map(s => (
+                                                <label key={s.id} className="flex items-center gap-2 p-2 hover:bg-secondary rounded cursor-pointer">
+                                                    <input type="checkbox" checked={selectedStates.includes(s.id)} onChange={() => onStatesChange(selectedStates.includes(s.id) ? selectedStates.filter(x => x !== s.id) : [...selectedStates, s.id])} />
+                                                    {s.name}
+                                                </label>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex h-9 items-end justify-end px-2 italic text-[9px] text-muted-foreground/50">
+                                    * Filtros avanzados integrados por AI
+                                </div>
+                            </div>
+                        </>
+                    )}
                 </div>
             </CardContent>
         </Card>

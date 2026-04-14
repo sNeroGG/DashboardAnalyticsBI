@@ -27,6 +27,7 @@ export interface ReportSession {
     name: string
     total_cuentas: number
     total_pagado: number
+    propina: number
     desglose?: ReportSessionDesglose[]
     cuentas?: ReportCuenta[]
 }
@@ -46,7 +47,7 @@ export interface ReportRow {
 
 export interface ReportData {
     data: ReportRow[]
-    usuarios: any[] // Temporal, podemos tipar mas estricto despues
+    usuarios: any[]
     metodos: any[]
 }
 
@@ -54,7 +55,8 @@ export interface ReportPayload {
     date_from: string
     date_to: string
     users?: number[]
-    payment_methods?: number[]
-    product_groups?: string[]
+    payments?: number[]
+    groups?: string[]
+    states?: string[]
     force_refresh?: boolean
 }

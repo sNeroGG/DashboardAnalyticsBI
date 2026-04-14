@@ -8,7 +8,12 @@ def authenticate_odoo_user(username, password):
     Authenticates against Odoo using /web/session/authenticate.
     Returns (user_id, error_message)
     """
-    url = f"{settings.ODOO_URL.rstrip('/')}/web/session/authenticate"
+    # We ensure we hit the base Odoo login, stripping /api if it was added for the REST client
+    base_url = settings.ODOO_URL.rstrip('/')
+    if base_url.endswith('/api'):
+        base_url = base_url[:-4]
+    
+    url = f"{base_url}/web/session/authenticate"
     payload = {
         "jsonrpc": "2.0",
         "method": "call",
