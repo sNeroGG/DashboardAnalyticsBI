@@ -1,63 +1,62 @@
-# Guía de Despliegue con Docker
+# Guía Maestra de Despliegue con Docker
 
-Esta guía te ayudará a subir y levantar el Dashboard en tu servidor sin afectar otros servicios, aislando todo en una carpeta dedicada.
+Esta guía ha sido optimizada para asegurar despliegues instantáneos, estables y sin choques de caché tanto en desarrollo local como en el servidor de Odoo (vía Caddy).
 
-## 1. Requisitos previos en el Servidor
-Asegúrate de que el servidor tenga instalado:
-- **Docker**: `docker --version`
-- **Docker Compose**: `docker-compose --version`
+## 1. Preparación Local y Sincronización
+Para asegurar que tu subida al servidor tarde solo un par de segundos y no horas, debes excluir manualmente las carpetas de recursos pesados antes de hacer la transferencia.
 
-## 2. Preparación (En tu PC local)
-Antes de subir los archivos por MobaXterm:
-1. Revisa tu archivo `backend/.env` y asegúrate de que las credenciales sean las correctas para el servidor.
-2. En `docker-compose.yml`, verifica el puerto del frontend (configurado en `3000:3000`).
+**❌ Omitir siempre estas carpetas (¡No las subas!):**
+- `frontend/node_modules/`
+- `frontend/.next/`
+- `backend/__pycache__/`
+- `backend/venv/` (si existe localmente)
 
-## 3. Transferencia (MobaXterm)
-1. Abre MobaXterm y conéctate a tu servidor por SSH.
-2. Crea una carpeta dedicada para el proyecto, por ejemplo: `mkdir ~/bi-dashboard`.
-3. Arrastra y suelta **todo el contenido** de tu carpeta local `dashboard/` a la carpeta `~/bi-dashboard` en el servidor (puedes excluir `node_modules` y `__pycache__` para que sea más rápido).
+1. Abre tu cliente (MobaXterm / FileZilla).
+2. Arrastra y suelta tu carpeta `dashboard/` hacia tu servidor (ej. `~/bi-dashboard`), recordando **excluir** las carpetas de arriba. Si por error arrastras alguna, el archivo invisible `.dockerignore` la bloqueará automáticamente para proteger al sistema.
 
-## 4. Despliegue
-Dentro de la terminal del servidor (dentro de la carpeta del proyecto):
+## 2. Compilación Segura en el Servidor
+Una vez transferidos los archivos, abre la consola SSH del servidor y dirígete al proyecto:
 
 ```bash
-# Entrar a la carpeta
-cd ~/bi-dashboard
-
-# Levantar los contenedores (esto descargará imágenes y construirá el app)
-docker-compose up -d --build
+cd /ruta/a/tu/dashboard
 ```
 
-## 5. Verificar estado
+Si estás realizando una actualización visual o de código (como la v1.5), siempre apaga el sistema viejo para liberar recursos y evitar retenciones:
 ```bash
-# Ver si los contenedores están corriendo
-docker-compose ps
-
-# Ver logs en tiempo real si algo falla
-docker-compose logs -f
-
-# 6. Cargar datos maestros (IMPORTANTE)
-# La primera vez, debes cargar los datos de Odoo ejecutando esto dentro del contenedor del backend:
-docker exec -it dashboard-backend python masters_loader.py
+docker compose down
 ```
 
-## Solución de Problemas Comunes
+Para compilar forzando compatibilidad segura y recargando todo el código nuevo, ejecuta:
 
-### Error de CORS (Acceso Denegado)
-Si accedes al dashboard desde una IP externa (no localhost), es posible que el navegador bloquee las peticiones al backend.
-- En `backend/bi_service.py`, localiza la sección de `CORS`.
-- Cambia `origins=["http://localhost:3000"]` por `origins=["*"]` para permitir cualquier origen (o pon la IP de tu servidor).
+```bash
+docker compose build --no-cache
+```
 
-### Cambiar la IP del Backend en el Frontend
-Si el frontend no logra conectar con el backend:
-1. Edita el archivo `docker-compose.yml`.
-2. Cambia `NEXT_PUBLIC_API_URL=http://localhost:5000` por `NEXT_PUBLIC_API_URL=http://TU_IP_SERVIDOR:5000`.
-3. Reinicia con `docker-compose up -d`.
+## 3. Encendido Limpio (Producción)
+Tras la compilación limpia, arranca el sistema. Como el archivo `docker-compose.yml` localiza ahora el puerto `3001`, este empatará de forma invisible con la ruta original de tu Caddyfile, sin tirar errores de puertos ocupados.
 
-## Ventajas de este método:
-- **Aislamiento total**: No tocas el Python del servidor ni instalas nada globalmente.
-- **Portabilidad**: Si cambias de servidor, solo mueves la carpeta y vuelves a ejecutar `docker-compose up`.
-- **Persistencia**: Los reportes y el cache se guardan en carpetas locales vinculadas al contenedor.
+```bash
+docker compose up -d
+```
+
+¡Listo! Ingresa a la IP/Dominio de tu servidor en el puerto correcto (ej. `http://herradura.dte-sv.com:8072/dashboard`) y todo estará fluyendo a la perfección.
 
 ---
-**Nota sobre el API URL**: Si vas a acceder desde fuera del servidor por su IP pública, asegúrate de cambiar `NEXT_PUBLIC_API_URL` en el `docker-compose.yml` por la IP de tu servidor: `http://123.123.123.123:5000`.
+
+## 4. Actualizaciones Parciales Rápidas (Un solo archivo)
+Si en el futuro cambias un solo archivo de tu código (por ejemplo, corregir un texto, un margen o una gráfica) y deseas mandarlo al servidor de producción **sin apagar nada ni generar errores**:
+
+1. Manda por MobaXterm únicamente el archivo o carpeta que cambiaste.
+2. Si el cambio fue en la parte visual (React), dile a Docker que repinte exclusivamente el código del frontend (esto toma sólo unos segundos):
+```bash
+docker compose build frontend
+docker compose up -d frontend
+```
+*(Si modificaste algo del lado de Python, cambias la palabra `frontend` por `backend` en esos dos comandos).*
+
+---
+
+### Solución a Problemas Rápidos
+- **El Docker Compose explota o crashea:** Significa que algo interrumpió el apagado y un contenedor híbrido sigue vivo. Bórralo con `docker compose down` o explícitamente `docker rm -f dashboard-frontend dashboard-backend`.
+- **Los diseños cargan sin colores (CSS en blanco):** Indica que Docker corrompió el `.next`. Asegúrate que el `.dockerignore` existe dentro de la carpeta `frontend/` y vuelve a ejecutar la recompilación.
+- **Port already in use 0.0.0.0:3000:** Significa que Caddy (o el dashboard viejo) no ha soltado el puerto. Recuerda que este Compose usa internamente el `3001:3000` para frontend y el `5000:5000` para backend. Si persiste, usa `docker compose down`.

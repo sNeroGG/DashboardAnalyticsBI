@@ -7,11 +7,13 @@ import { FiltersSection } from '@/components/dashboard/filters-section'
 import { StatsCards } from '@/components/dashboard/stats-cards'
 import { ChartsSection } from '@/components/dashboard/charts-section'
 import { DataTable } from '@/components/dashboard/data-table'
-import { ReportTabs } from '@/components/dashboard/report-tabs'
+import { PaymentMethods } from '@/components/dashboard/report-tabs'
+import { UserCharts } from '@/components/dashboard/user-charts'
+import { UserTable } from '@/components/dashboard/user-table'
 import { dashboardAPI } from '@/lib/api'
 import type { ReportData, Masters } from '@/lib/types'
 import { Button } from '@/components/ui/button'
-import { LogOut, RefreshCcw, LayoutDashboard, Database, Filter } from 'lucide-react'
+import { LogOut, RefreshCcw, LayoutDashboard, Database, BarChart2, Users, ShoppingBag } from 'lucide-react'
 
 export default function DashboardPage() {
     const [dateFrom, setDateFrom] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'))
@@ -24,7 +26,7 @@ export default function DashboardPage() {
     const [masters, setMasters] = useState<Masters | undefined>(undefined)
     const [isLoading, setIsLoading] = useState(false)
     const [isForcingRefresh, setIsForcingRefresh] = useState(false)
-    const [viewMode, setViewMode] = useState<'main' | 'advanced'>('main')
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'purchases'>('dashboard')
     const router = useRouter()
 
     const odooStates = [
@@ -41,10 +43,10 @@ export default function DashboardPage() {
             router.push('/login')
             return
         }
-        
+
         loadMasters()
         fetchReport()
-    }, [viewMode])
+    }, [activeTab]) // Re-fetch or apply rules on tab change
 
     const loadMasters = async () => {
         try {
@@ -61,10 +63,10 @@ export default function DashboardPage() {
             const { data } = await dashboardAPI.getReportVentas({
                 date_from: dateFrom,
                 date_to: dateTo,
-                users: viewMode === 'advanced' ? selectedUsers : [],
-                payments: viewMode === 'advanced' ? selectedPayments : [],
-                groups: viewMode === 'advanced' ? selectedProductGroups : [],
-                states: viewMode === 'advanced' ? selectedStates : [],
+                users: activeTab === 'dashboard' || activeTab === 'users' ? selectedUsers : [],
+                payments: activeTab === 'dashboard' ? selectedPayments : [],
+                groups: activeTab === 'dashboard' ? selectedProductGroups : [],
+                states: activeTab === 'dashboard' ? selectedStates : [],
                 force_refresh: force || isForcingRefresh
             })
             setReportData(data)
@@ -91,7 +93,7 @@ export default function DashboardPage() {
                         <LayoutDashboard className="h-8 w-8 text-primary" />
                     </div>
                     <div>
-                        <h1 className="text-3xl font-black text-foreground tracking-tighter italic">BI ANALYTICS <span className="text-primary font-normal not-italic">Odoo v1.0</span></h1>
+                        <h1 className="text-3xl font-black text-foreground tracking-tighter italic">BI ANALYTICS <span className="text-primary font-normal not-italic">Odoo v1.5</span></h1>
                         <p className="text-sm text-muted-foreground font-medium">Panel de Control Estratégico Herradura</p>
                     </div>
                 </div>
@@ -108,25 +110,33 @@ export default function DashboardPage() {
             </div>
 
             {/* Navigation Tabs */}
-            <div className="flex space-x-2 border-b border-border/50 pb-2">
+            <div className="flex space-x-2 border-b border-border/50 pb-2 overflow-x-auto scrollbar-hide">
                 <button
-                    onClick={() => setViewMode('main')}
-                    className={`px-4 py-2 text-sm font-bold tracking-widest uppercase transition-colors rounded-t-md ${viewMode === 'main' ? 'bg-primary/10 text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'}`}
+                    onClick={() => setActiveTab('dashboard')}
+                    className={`px-4 py-2 text-sm font-bold tracking-widest uppercase transition-colors rounded-t-md flex items-center gap-2 whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-primary/10 text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'}`}
                 >
-                    Dashboard General
+                    <BarChart2 className="h-4 w-4" />
+                    Dashboard
                 </button>
                 <button
-                    onClick={() => setViewMode('advanced')}
-                    className={`px-4 py-2 text-sm font-bold tracking-widest uppercase transition-colors rounded-t-md flex items-center gap-2 ${viewMode === 'advanced' ? 'bg-primary/10 text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'}`}
+                    onClick={() => setActiveTab('users')}
+                    className={`px-4 py-2 text-sm font-bold tracking-widest uppercase transition-colors rounded-t-md flex items-center gap-2 whitespace-nowrap ${activeTab === 'users' ? 'bg-primary/10 text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'}`}
                 >
-                    <Filter className="h-4 w-4" />
-                    Análisis Avanzado
+                    <Users className="h-4 w-4" />
+                    Ventas por Usuario
+                </button>
+                <button
+                    onClick={() => setActiveTab('purchases')}
+                    className={`px-4 py-2 text-sm font-bold tracking-widest uppercase transition-colors rounded-t-md flex items-center gap-2 whitespace-nowrap ${activeTab === 'purchases' ? 'bg-primary/10 text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'}`}
+                >
+                    <ShoppingBag className="h-4 w-4" />
+                    Compras por proveedor
                 </button>
             </div>
 
             {/* Filters */}
             <FiltersSection
-                viewMode={viewMode}
+                activeTab={activeTab}
                 dateFrom={dateFrom}
                 dateTo={dateTo}
                 selectedUsers={selectedUsers}
@@ -147,22 +157,48 @@ export default function DashboardPage() {
 
             {reportData ? (
                 <>
-                    <StatsCards data={reportData.data} />
-                    
-                    <div className="flex flex-col gap-8">
-                        <div className="w-full">
-                            <ChartsSection data={reportData.data} />
-                        </div>
-                        <div className="w-full">
-                             <ReportTabs 
-                                reportData={reportData} 
-                                masters={masters!} 
-                                selectedPayments={selectedPayments}
-                             />
-                        </div>
-                    </div>
+                    {/* DASHBOARD TAB CONTENT */}
+                    {activeTab === 'dashboard' && (
+                        <div className="space-y-8 animate-in fade-in duration-500">
+                            <StatsCards data={reportData.data || []} />
 
-                    <DataTable data={reportData.data} />
+                            <div className="flex flex-col gap-8">
+                                <div className="w-full">
+                                    <ChartsSection data={reportData.data || []} />
+                                </div>
+                                <div className="w-full">
+                                    <PaymentMethods
+                                        reportData={reportData}
+                                        masters={masters!}
+                                        selectedPayments={selectedPayments}
+                                    />
+                                </div>
+                            </div>
+
+                            <DataTable data={reportData.data || []} />
+                        </div>
+                    )}
+
+                    {/* USERS TAB CONTENT */}
+                    {activeTab === 'users' && (
+                        <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
+                            <div className="w-full">
+                                <UserCharts usuarios={reportData.usuarios || []} />
+                            </div>
+                            <div className="w-full">
+                                <UserTable usuarios={reportData.usuarios || []} />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* PURCHASES TAB CONTENT */}
+                    {activeTab === 'purchases' && (
+                        <div className="animate-in fade-in slide-in-from-right-4 duration-500 h-64 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl bg-muted/30">
+                            <ShoppingBag className="h-12 w-12 text-muted-foreground mb-4" />
+                            <h3 className="text-xl font-bold text-foreground mb-2">Sección en Construcción</h3>
+                            <p className="text-muted-foreground font-medium">Las compras acumuladas por proveedor estarán disponibles pronto.</p>
+                        </div>
+                    )}
                 </>
             ) : (
                 <div className="h-64 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl bg-muted/30">

@@ -1,13 +1,14 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Search, Loader2, Calendar, Users, CreditCard, Layers, ChevronDown, Filter, Target } from 'lucide-react'
+import { Search, Loader2, Calendar, Users, CreditCard, Layers, ChevronDown, Filter, Target, Info } from 'lucide-react'
 import type { Masters } from '@/lib/types'
+import { format, addDays } from 'date-fns'
 
 interface FiltersSectionProps {
-    viewMode?: 'main' | 'advanced'
+    activeTab?: 'dashboard' | 'users' | 'purchases'
     dateFrom: string
     dateTo: string
     selectedUsers: number[]
@@ -27,7 +28,7 @@ interface FiltersSectionProps {
 }
 
 export function FiltersSection({
-    viewMode = 'main',
+    activeTab = 'dashboard',
     dateFrom,
     dateTo,
     selectedUsers,
@@ -47,7 +48,8 @@ export function FiltersSection({
 }: FiltersSectionProps) {
     const [openDropdown, setOpenDropdown] = useState<string | null>(null)
     const [queryMode, setQueryMode] = useState<'day' | 'month' | 'year'>('month')
-    const [selectedYear, setSelectedYear] = useState('2026')
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString())
+    const [showAdvanced, setShowAdvanced] = useState(false)
     const dropdownRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
@@ -60,11 +62,22 @@ export function FiltersSection({
         return () => document.removeEventListener('mousedown', handleClickOutside)
     }, [])
 
+    // Ensure advanced filters are hidden if not on dashboard
+    useEffect(() => {
+        if (activeTab !== 'dashboard') {
+            setShowAdvanced(false)
+            // also clear specific filters since we are hiding them and user shouldn't expect them to apply
+            if (selectedUsers.length > 0) onUsersChange([])
+            if (selectedPayments.length > 0) onPaymentsChange([])
+            if (selectedStates.length > 0) onStatesChange([])
+        }
+    }, [activeTab])
+
     const toggleDropdown = (name: string) => {
         setOpenDropdown(openDropdown === name ? null : name)
     }
 
-    const years = ['2024', '2025', '2026']
+    const years = ['2023', '2024', '2025', '2026']
     const modes = [
         { id: 'day', name: 'Día Específico', icon: Target },
         { id: 'month', name: 'Mes Completo', icon: Calendar },
@@ -96,13 +109,42 @@ export function FiltersSection({
     const currentMonthNum = dateFrom.split('-')[1]
     const currentMonthName = months.find(m => m.id === currentMonthNum)?.name
 
+    const evaluationText = useMemo(() => {
+        const fromD = new Date(dateFrom + 'T00:00:00')
+        const toD = new Date(dateTo + 'T00:00:00')
+        const df = format(fromD, 'dd/MM/yyyy')
+        const dt = format(addDays(toD, 1), 'dd/MM/yyyy')
+
+        let base = ''
+        if (queryMode === 'day') {
+            base = `Evaluando la jornada del ${df} (desde el ${df} 04:00 hasta el ${dt} 04:00)`
+        } else if (queryMode === 'year') {
+            base = `Evaluando todo el año ${selectedYear} (desde el ${df} 04:00 hasta el ${dt} 04:00)`
+        } else {
+            base = `Evaluando todo el mes de ${currentMonthName} (desde el ${df} 04:00 hasta el ${dt} 04:00)`
+        }
+
+        if (activeTab === 'users' || activeTab === 'dashboard') {
+            if (selectedUsers.length > 0 && masters?.['res.users']) {
+                const names = selectedUsers
+                    .map(uid => masters['res.users'].find(u => u.id === uid)?.name)
+                    .filter(Boolean)
+                    .join(', ')
+                base += ` • Del usuario(s): ${names}`
+            }
+        }
+        
+        return base
+    }, [dateFrom, dateTo, queryMode, selectedYear, currentMonthName, selectedUsers, masters, activeTab])
+
+
     return (
         <Card className="border-2 shadow-2xl bg-card border-primary/20 overflow-visible">
             <CardContent className="p-5">
                 <div className="flex flex-col gap-6" ref={dropdownRef}>
                     
                     {/* FILA 1: SELECTORES RÁPIDOS */}
-                    <div className="grid grid-cols-1 md:grid-cols-10 gap-4 items-end">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                         
                         {/* 1. MODO */}
                         <div className="md:col-span-2 space-y-1.5 relative text-left">
@@ -123,7 +165,7 @@ export function FiltersSection({
                         </div>
 
                         {/* 2. AÑO */}
-                        <div className="md:col-span-1 space-y-1.5 relative text-left">
+                        <div className="md:col-span-2 space-y-1.5 relative text-left">
                             <Label className="text-[10px] uppercase font-bold text-primary tracking-widest pl-1">Año</Label>
                             <div onClick={() => toggleDropdown('year')} className="flex h-10 w-full cursor-pointer items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-xs hover:border-primary transition-all">
                                 <span className="font-bold">{selectedYear}</span>
@@ -167,24 +209,38 @@ export function FiltersSection({
                              {queryMode === 'year' && (
                                 <>
                                     <Label className="text-[10px] uppercase font-bold text-primary tracking-widest pl-1">Reporte Anual</Label>
-                                    <div className="h-10 flex items-center px-3 bg-primary/20 border border-primary/30 rounded text-[10px] font-black italic text-primary">TODO EL AÑO {selectedYear} SELECCIONADO</div>
+                                    <div className="h-10 flex items-center px-3 bg-primary/20 border border-primary/30 rounded text-xs font-black italic text-primary">TODO EL AÑO {selectedYear} SELECCIONADO</div>
                                 </>
                             )}
                         </div>
 
                         {/* 4. BOTON CONSULTAR */}
-                        <div className="md:col-span-4 pl-4 pt-1 items-end flex h-10 w-full">
-                            <Button onClick={(e) => { e.preventDefault(); onFetchReport(); }} disabled={isLoading} className="w-full h-full bg-primary hover:bg-primary/90 text-white font-black rounded shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-2 text-sm italic tracking-widest uppercase">
-                                {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <><Search className="h-5 w-5" /> Consultar Reporte</>}
+                        <div className="md:col-span-3 pl-2 pt-1 items-end flex h-10 w-full">
+                            <Button onClick={(e) => { e.preventDefault(); onFetchReport(); }} disabled={isLoading} className="w-full h-full bg-primary hover:bg-primary/90 text-white font-black rounded shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-2 text-xs italic tracking-widest uppercase">
+                                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Search className="h-4 w-4" /> Consultar</>}
                             </Button>
                         </div>
+                        
+                        {/* 5. TOGGLE FILTROS AVANZADOS (SOLO EN DASHBOARD) */}
+                        {activeTab === 'dashboard' && (
+                            <div className="md:col-span-2 pt-1 items-end flex h-10 w-full">
+                                <Button 
+                                    variant={showAdvanced ? "default" : "outline"}
+                                    onClick={() => setShowAdvanced(!showAdvanced)} 
+                                    className="w-full h-full text-xs font-bold gap-2"
+                                >
+                                    <Filter className="h-4 w-4" />
+                                    {showAdvanced ? "Ocultar" : "Avanzados"}
+                                </Button>
+                            </div>
+                        )}
                     </div>
 
                     {/* FILA 2: FILTROS AVANZADOS (DROPDOWNS) */}
-                    {viewMode === 'advanced' && (
-                        <>
-                            <div className="h-px w-full bg-border/40" />
-                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-left">
+                    {activeTab === 'dashboard' && showAdvanced && (
+                        <div className="animate-in slide-in-from-top-4 fade-in duration-300">
+                            <div className="h-px w-full bg-border/40 mb-4" />
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-left">
                                 <div className="space-y-1.5 relative">
                                     <Label className="text-[9px] uppercase font-bold text-muted-foreground tracking-widest pl-1">Usuarios / Cajeros</Label>
                                     <div onClick={() => toggleDropdown('users')} className={`flex h-9 w-full cursor-pointer items-center justify-between rounded border px-3 py-2 text-[10px] ${selectedUsers.length > 0 ? 'border-primary bg-primary/5' : 'bg-background'}`}>
@@ -238,13 +294,19 @@ export function FiltersSection({
                                         </div>
                                     )}
                                 </div>
-
                                 <div className="flex h-9 items-end justify-end px-2 italic text-[9px] text-muted-foreground/50">
                                     * Filtros avanzados integrados por AI
                                 </div>
                             </div>
-                        </>
+                        </div>
                     )}
+                    
+                    {/* EVALUATION TEXT */}
+                    <div className="flex items-center gap-2 justify-center text-xs font-medium text-muted-foreground bg-muted/20 py-2 rounded-md border border-border/30">
+                        <Info className="h-4 w-4 text-primary" />
+                        <span>{evaluationText}</span>
+                    </div>
+
                 </div>
             </CardContent>
         </Card>

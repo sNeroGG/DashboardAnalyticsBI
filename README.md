@@ -49,19 +49,40 @@ Interfaz premium con enfoque en UX:
 | `restaurante_efectivo` | Suma de montos captados en efectivo (Excluye método de pago ID 2). |
 | `tarjeta` | Suma de montos captados mediante terminales bancarias (Método de pago ID 2). |
 
-## ⚙️ Ejecución del Proyecto
+## ⚙️ Ejecución del Proyecto para Nuevos Usuarios
 
-### Desarrollo Local
-1.  **Backend**: `cd backend && python bi_service.py` (Puerto 5000).
-2.  **Frontend**: `cd frontend && npm run dev` (Puerto 3000).
+Esta plataforma está configurada para garantizar un ambiente seguro, limpio y libre de conflictos gracias a la adopción del estándar *Docker Compose v2*. Para instrucciones de producción (Servidores en Vivo y Proxies Caddy), lee obligatoriamente el archivo maestro **`DEPLOY.md`**.
 
-*Nota: Asegúrate de tener configurado el archivo `.env` en la carpeta `backend` con las credenciales de Odoo y `DEV_MODE=True` para omitir login en pruebas.*
+### 1. Requisitos Previos
+- Instalar **Docker** y el plugin moderno de **Docker Compose** (versión V2+). No utilices el comando antiguo con guion (`docker-compose`).
+- Mapeo de puertos configurado por defecto: 
+  - Frontend (NextJS): `3001`
+  - Backend (Flask/Python): `5000`
 
-### Producción (Docker)
-Levanta todo el stack con un solo comando:
+### 2. Variables de Entorno (.env)
+Antes de iniciar, debes preparar las llaves del castillo:
+1. Dirígete a la carpeta `/backend/` e identifica el archivo `.env.example`.
+2. Duplícalo y renómbralo a `.env`.
+3. Rellena las credenciales de tu base de datos Odoo objetivo.
+*(Activa `DEV_MODE=True` si necesitas evitar el login de seguridad durante las pruebas locales)*.
+
+### 3. Levantar el Entorno Inmediato
+Gracias a que hemos configurado archivos `.dockerignore` estrictos, todo es automático. No necesitas instalar dependencias de Node o de Python de forma nativa ni preocuparte por cachés bloqueados.
+
+Vuela a la raíz del proyecto y enciende los motores:
+
 ```bash
-docker-compose up -d --build
+# Empacar y crear los contenedores desde cero
+docker compose build
+
+# Levantar silenciosa y eficientemente
+docker compose up -d
+```
+
+Si necesitas deshacer, destruir o reiniciar el sistema entero para recuperar el control sin dejar rastros de recursos en el servidor:
+```bash
+docker compose down
 ```
 
 ---
-*Este proyecto transforma datos crudos de Odoo en decisiones estratégicas inteligentes.*
+*Este proyecto transforma el caos de datos crudos de tu ERP Odoo en decisiones estratégicas inteligentes, eficientes y seguras.*
