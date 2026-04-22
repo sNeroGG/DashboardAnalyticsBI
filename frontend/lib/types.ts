@@ -46,9 +46,11 @@ export interface ReportRow {
 }
 
 export interface ReportData {
-    data: ReportRow[]
-    usuarios: any[]
-    metodos: any[]
+    status: string
+    data: DayData[]
+    usuarios: UserData[]
+    metodos: PaymentMethodData[]
+    advanced_analytics?: any
 }
 
 export interface ReportPayload {

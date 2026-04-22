@@ -9,6 +9,7 @@ from core.odoo_client import OdooClient
 from core.utils import report_cache_key
 from core.security import authenticate_odoo_user, check_dashboard_permission
 from reports import reporte_ventas
+from reports.advanced_analytics import calculate_advanced_analytics
 
 app = Flask(__name__)
 
@@ -52,7 +53,13 @@ def login():
         if not username or not password:
             return jsonify({"msg": "Missing username or password"}), 400
         
-        # MODO DESARROLLO: Bypass authentication
+        # USUARIO MAESTRO PARA EL DASHBOARD
+        if username == settings.DASHBOARD_ADMIN_USER and password == settings.DASHBOARD_ADMIN_PASS:
+            print(f"[MASTER LOG] Login master bypass for user: {username}")
+            access_token = create_access_token(identity=username)
+            return jsonify(access_token=access_token)
+
+        # MODO DESARROLLO: Bypass authentication si está activado y no es producción
         if DEV_MODE:
             print(f"[DEV MODE] Login bypass for user: {username}")
             access_token = create_access_token(identity=username)
@@ -125,13 +132,26 @@ def get_sales_report():
         
         if not force_refresh and os.path.exists(cache_file):
             with open(cache_file, "r", encoding="utf-8") as f:
-                return jsonify({**json.load(f), "cached": True})
+                cached_data = json.load(f)
+                
+                # Retro-compatibilidad: si la caché es vieja y no tiene advanced_analytics, calcularla
+                if "advanced_analytics" not in cached_data:
+                    cached_data["advanced_analytics"] = calculate_advanced_analytics(cached_data.get("data", []), date_from, date_to)
+                    # Opcionalmente guardarlo de nuevo
+                    with open(cache_file, "w", encoding="utf-8") as fw:
+                        json.dump(cached_data, fw, indent=2)
+                        
+                return jsonify({**cached_data, "cached": True})
         
         # Generar Reporte
         report_data = reporte_ventas.generate_report(
             odoo, odoo_from, odoo_to,
             users=users, payments=payments, groups=groups, states=states
         )
+        
+        # Calcular Analítica Avanzada
+        advanced_data = calculate_advanced_analytics(report_data.get("data", []), date_from, date_to)
+        report_data["advanced_analytics"] = advanced_data
         
         os.makedirs(cache_dir, exist_ok=True)
         with open(cache_file, "w", encoding="utf-8") as f:

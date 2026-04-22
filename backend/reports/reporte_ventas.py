@@ -39,7 +39,7 @@ def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=
     if users: domain.append(("user_id", "in", [int(u) for u in users]))
 
 
-    fields = ["id", "name", "date_order", "amount_total", "state", "user_id", "tip_amount", "session_id"]
+    fields = ["id", "name", "date_order", "amount_total", "state", "user_id", "tip_amount", "session_id", "customer_count"]
     orders = odoo.search("pos.order", domain, fields)
     
     if not orders: return {"status": "success", "data": [], "usuarios": [], "metodos": []}
@@ -71,7 +71,7 @@ def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=
             summary_days[d_bus] = {
                 "fecha": d_bus, "total_cuentas": 0, "total_pagado": 0.0,
                 "alimentos": 0.0, "bebidas": 0.0, "propina": 0.0, "otros": 0.0,
-                "restaurante_efectivo": 0.0, "tarjeta": 0.0, "sesiones": []
+                "restaurante_efectivo": 0.0, "tarjeta": 0.0, "total_personas": 0, "sesiones": []
             }
         
         o_id = o["id"]
@@ -93,6 +93,9 @@ def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=
         summary_days[d_bus]["propina"] += o_tip
         summary_days[d_bus]["alimentos"] += (o_total - o_tip) * 0.7
         summary_days[d_bus]["bebidas"] += (o_total - o_tip) * 0.3
+        
+        o_personas = o.get("customer_count") or 1 # Fallback a 1 si es 0 o null para no dividir por 0
+        summary_days[d_bus]["total_personas"] += o_personas
         
         # CLASIFICACIÓN BASADA EN TUS IDs REALES
         if not o_pays and not payments:
@@ -149,11 +152,21 @@ def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=
             "nombre": o["name"],
             "propina": o_tip,
             "total": o_total,
+            "personas": o_personas,
+            "ticket_promedio_persona": o_total / o_personas if o_personas > 0 else o_total,
             "estado": o.get("state")
         })
 
     # Formatear respuesta
     report_list = sorted(list(summary_days.values()), key=lambda x: x["fecha"])
+    
+    # Calcular promedio por persona por día
+    for day in report_list:
+        if day["total_personas"] > 0:
+            day["ticket_promedio_persona"] = day["total_pagado"] / day["total_personas"]
+        else:
+            day["ticket_promedio_persona"] = 0.0
+
     usuarios_list = sorted(list(summary_users.values()), key=lambda x: x["ventas"], reverse=True)
     
     return {

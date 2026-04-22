@@ -8,9 +8,11 @@ import type { Masters } from '@/lib/types'
 import { format, addDays } from 'date-fns'
 
 interface FiltersSectionProps {
-    activeTab?: 'dashboard' | 'users' | 'purchases'
+    activeTab?: 'dashboard' | 'analitica' | 'comparativa' | 'users' | 'purchases'
     dateFrom: string
     dateTo: string
+    compareDateFrom?: string
+    compareDateTo?: string
     selectedUsers: number[]
     selectedPayments: number[]
     selectedProductGroups: string[]
@@ -19,6 +21,8 @@ interface FiltersSectionProps {
     odooStates: { id: string, name: string }[]
     onDateFromChange: (date: string) => void
     onDateToChange: (date: string) => void
+    onCompareDateFromChange?: (date: string) => void
+    onCompareDateToChange?: (date: string) => void
     onUsersChange: (users: number[]) => void
     onPaymentsChange: (payments: number[]) => void
     onProductGroupsChange: (groups: string[]) => void
@@ -31,6 +35,8 @@ export function FiltersSection({
     activeTab = 'dashboard',
     dateFrom,
     dateTo,
+    compareDateFrom,
+    compareDateTo,
     selectedUsers,
     selectedPayments,
     selectedProductGroups,
@@ -39,6 +45,8 @@ export function FiltersSection({
     odooStates,
     onDateFromChange,
     onDateToChange,
+    onCompareDateFromChange,
+    onCompareDateToChange,
     onUsersChange,
     onPaymentsChange,
     onProductGroupsChange,
@@ -47,7 +55,7 @@ export function FiltersSection({
     isLoading,
 }: FiltersSectionProps) {
     const [openDropdown, setOpenDropdown] = useState<string | null>(null)
-    const [queryMode, setQueryMode] = useState<'day' | 'month' | 'year'>('month')
+    const [queryMode, setQueryMode] = useState<'day' | 'month' | 'quarter' | 'year'>('month')
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString())
     const [showAdvanced, setShowAdvanced] = useState(false)
     const dropdownRef = useRef<HTMLDivElement>(null)
@@ -81,6 +89,7 @@ export function FiltersSection({
     const modes = [
         { id: 'day', name: 'Día Específico', icon: Target },
         { id: 'month', name: 'Mes Completo', icon: Calendar },
+        { id: 'quarter', name: 'Trimestre (3 meses)', icon: Layers },
         { id: 'year', name: 'Año Completo', icon: Layers }
     ]
 
@@ -91,10 +100,26 @@ export function FiltersSection({
         { id: '10', name: 'Octubre' }, { id: '11', name: 'Noviembre' }, { id: '12', name: 'Diciembre' }
     ]
 
-    const handleSmartChange = (mode: 'day' | 'month' | 'year', value: string) => {
+    const handleSmartChange = (mode: 'day' | 'month' | 'quarter' | 'year', value: string) => {
         if (mode === 'year') {
             onDateFromChange(`${value}-01-01`)
             onDateToChange(`${value}-12-31`)
+        } else if (mode === 'quarter') {
+            const startMonth = parseInt(value)
+            let endMonth = startMonth + 2
+            let endYear = parseInt(selectedYear)
+            
+            if (endMonth > 12) {
+                endMonth -= 12
+                endYear += 1
+            }
+            
+            const startStr = value.padStart(2, '0')
+            const endStr = endMonth.toString().padStart(2, '0')
+            const lastDay = new Date(endYear, endMonth, 0).getDate()
+            
+            onDateFromChange(`${selectedYear}-${startStr}-01`)
+            onDateToChange(`${endYear}-${endStr}-${lastDay}`)
         } else if (mode === 'month') {
             const lastDay = new Date(parseInt(selectedYear), parseInt(value), 0).getDate()
             onDateFromChange(`${selectedYear}-${value}-01`)
@@ -105,11 +130,34 @@ export function FiltersSection({
         }
     }
 
-    // Nombre del mes basado en la fecha dateFrom
+    const handleMonthInput = (value: string, isCompare = false) => {
+        if (!value) return;
+        const [y, m] = value.split('-')
+        const lastDay = new Date(parseInt(y), parseInt(m), 0).getDate()
+        if (isCompare && onCompareDateFromChange && onCompareDateToChange) {
+            onCompareDateFromChange(`${y}-${m}-01`)
+            onCompareDateToChange(`${y}-${m}-${lastDay}`)
+        } else {
+            onDateFromChange(`${y}-${m}-01`)
+            onDateToChange(`${y}-${m}-${lastDay}`)
+        }
+    }
+
+    // Identificar mes o trimestre
     const currentMonthNum = dateFrom.split('-')[1]
     const currentMonthName = months.find(m => m.id === currentMonthNum)?.name
+    
+    // Calcular el mes final para el nombre del trimestre
+    const toMonthNum = dateTo.split('-')[1]
+    const toMonthName = months.find(m => m.id === toMonthNum)?.name
 
     const evaluationText = useMemo(() => {
+        if (activeTab === 'comparativa') {
+            const m1 = dateFrom.substring(0, 7)
+            const m2 = compareDateFrom ? compareDateFrom.substring(0, 7) : ''
+            return `Comparando el rendimiento entre ${m1} y ${m2}`
+        }
+
         const fromD = new Date(dateFrom + 'T00:00:00')
         const toD = new Date(dateTo + 'T00:00:00')
         const df = format(fromD, 'dd/MM/yyyy')
@@ -120,6 +168,8 @@ export function FiltersSection({
             base = `Evaluando la jornada del ${df} (desde el ${df} 04:00 hasta el ${dt} 04:00)`
         } else if (queryMode === 'year') {
             base = `Evaluando todo el año ${selectedYear} (desde el ${df} 04:00 hasta el ${dt} 04:00)`
+        } else if (queryMode === 'quarter') {
+            base = `Evaluando el trimestre de ${currentMonthName} a ${toMonthName} (desde el ${df} 04:00 hasta el ${dt} 04:00)`
         } else {
             base = `Evaluando todo el mes de ${currentMonthName} (desde el ${df} 04:00 hasta el ${dt} 04:00)`
         }
@@ -144,6 +194,23 @@ export function FiltersSection({
                 <div className="flex flex-col gap-6" ref={dropdownRef}>
                     
                     {/* FILA 1: SELECTORES RÁPIDOS */}
+                    {activeTab === 'comparativa' ? (
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                            <div className="md:col-span-4 space-y-1.5 relative text-left">
+                                <Label className="text-[10px] uppercase font-bold text-primary tracking-widest pl-1">Mes Base (Mes 1)</Label>
+                                <Input type="month" value={dateFrom.substring(0, 7)} onChange={(e) => handleMonthInput(e.target.value, false)} className="h-10 text-xs font-bold border-primary [color-scheme:dark]" />
+                            </div>
+                            <div className="md:col-span-4 space-y-1.5 relative text-left">
+                                <Label className="text-[10px] uppercase font-bold text-primary tracking-widest pl-1">Mes a Comparar (Mes 2)</Label>
+                                <Input type="month" value={compareDateFrom ? compareDateFrom.substring(0, 7) : ''} onChange={(e) => handleMonthInput(e.target.value, true)} className="h-10 text-xs font-bold border-primary [color-scheme:dark]" />
+                            </div>
+                            <div className="md:col-span-4 pl-2 pt-1 items-end flex h-10 w-full">
+                                <Button onClick={(e) => { e.preventDefault(); onFetchReport(); }} disabled={isLoading || !compareDateFrom} className="w-full h-full bg-primary hover:bg-primary/90 text-white font-black rounded shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-2 text-xs italic tracking-widest uppercase">
+                                    {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Search className="h-4 w-4" /> Comparar</>}
+                                </Button>
+                            </div>
+                        </div>
+                    ) : (
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
                         
                         {/* 1. MODO */}
@@ -206,6 +273,24 @@ export function FiltersSection({
                                     <Input type="date" value={dateFrom} onChange={(e) => handleSmartChange('day', e.target.value)} className="h-10 text-xs font-bold border-primary" />
                                 </>
                             )}
+                            {queryMode === 'quarter' && (
+                                <>
+                                    <Label className="text-[10px] uppercase font-bold text-primary tracking-widest pl-1">Escoge el primer mes del trimestre</Label>
+                                    <div onClick={() => toggleDropdown('quarter')} className="flex h-10 w-full cursor-pointer items-center justify-between rounded-md border-2 border-primary bg-primary/5 px-3 py-2 text-xs hover:shadow-[0_0_15px_rgba(239,68,68,0.2)] transition-all">
+                                        <span className="font-black text-primary text-sm uppercase">
+                                            {currentMonthName ? `${currentMonthName} a ${toMonthName}` : '--- SELECCIONA PRIMER MES ---'}
+                                        </span>
+                                        <ChevronDown className="h-4 w-4 text-primary" />
+                                    </div>
+                                    {openDropdown === 'quarter' && (
+                                        <div className="absolute z-[70] mt-1 w-full grid grid-cols-4 gap-1 bg-popover border border-border rounded-md shadow-2xl p-2">
+                                            {months.map(m => (
+                                                <div key={m.id} onClick={() => { handleSmartChange('quarter', m.id); setOpenDropdown(null); }} className={`px-2 py-3 text-[9px] text-center rounded transition-all cursor-pointer border border-border/40 font-bold ${currentMonthNum === m.id ? 'bg-primary text-white' : 'hover:bg-primary/10'}`}>{m.name.toUpperCase()}</div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </>
+                            )}
                              {queryMode === 'year' && (
                                 <>
                                     <Label className="text-[10px] uppercase font-bold text-primary tracking-widest pl-1">Reporte Anual</Label>
@@ -235,6 +320,7 @@ export function FiltersSection({
                             </div>
                         )}
                     </div>
+                    )}
 
                     {/* FILA 2: FILTROS AVANZADOS (DROPDOWNS) */}
                     {activeTab === 'dashboard' && showAdvanced && (

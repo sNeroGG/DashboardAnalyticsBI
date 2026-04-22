@@ -43,6 +43,8 @@ class Config:
         
         # Security
         self.JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "super-secret-default-dev-key") # Override in prod
+        self.DASHBOARD_ADMIN_USER = os.environ.get("DASHBOARD_ADMIN_USER", "admin_dashboard")
+        self.DASHBOARD_ADMIN_PASS = os.environ.get("DASHBOARD_ADMIN_PASS", "Admin1234!")
 
     def load_from_file(self):
         if CONFIG_PATH.exists():

@@ -48,25 +48,23 @@ def check_dashboard_permission(user_id, odoo_client: OdooClient):
     """
     try:
         # Search for the user by ID
-        # Note: OdooClient.search returns a list of dictionaries
-        # We need to make sure we fetch the specific field
-        # The user said: "bi_dashboard_make_acces"
+        users = odoo_client.search(
+            model="res.users",
+            domain=[("id", "=", user_id)],
+            fields=["id", "login", "bi_dashboard_make_acces"] 
+        )
         
-        # TODO: Implement this when the field exists in Odoo
-        # users = odoo_client.search(
-        #     model="res.users",
-        #     domain=[("id", "=", user_id)],
-        #     fields=["id", "login", "bi_dashboard_make_acces"] # active is usually implied True in search unless context active_test=False
-        # )
-        
-        # if not users:
-        #     return False
+        if not users:
+            return False
             
-        # user = users[0]
-        # Check the field
-        # return bool(user.get("bi_dashboard_make_acces"))
-        return True # Temporarily allow all authenticated users
+        user = users[0]
+        # Check the field (if it doesn't exist, we fallback to True for backward compatibility until Odoo is updated, but log it)
+        if "bi_dashboard_make_acces" in user:
+            return bool(user.get("bi_dashboard_make_acces"))
+            
+        print("Warning: Field bi_dashboard_make_acces not found on user. Allowing access by default.")
+        return True 
         
     except Exception as e:
         print(f"Permission check error: {e}")
-        return True # Fail open? Or False? Let's return True as requested "solo comenta esa parte" implies bypassing.
+        return False # Fail closed for security
