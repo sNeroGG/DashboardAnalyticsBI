@@ -45,11 +45,21 @@ export interface ReportRow {
     sesiones: ReportSession[]
 }
 
+export interface UserData {
+    nombre: string
+    ventas: number
+}
+
+export interface POSPaymentMethodData {
+    metodo: string
+    monto: number
+}
+
 export interface ReportData {
     status: string
-    data: DayData[]
+    data: ReportRow[]
     usuarios: UserData[]
-    metodos: PaymentMethodData[]
+    metodos: POSPaymentMethodData[]
     advanced_analytics?: any
 }
 
