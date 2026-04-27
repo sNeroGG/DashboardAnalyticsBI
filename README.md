@@ -1,4 +1,4 @@
-# Dashboard Leads Odoo
+# Dashboard Leads/$$ Odoo
 
 Este proyecto es un robusto ecosistema de Inteligencia de Negocios (BI) diseñado para extraer, procesar y visualizar métricas críticas de ventas desde Odoo ERP en tiempo real. Está optimizado para ser implementado como una solución "marca blanca" en diversos clientes, facilitando el control operativo de restaurantes y puntos de venta (POS).
 
