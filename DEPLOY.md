@@ -21,7 +21,7 @@ Una vez transferidos los archivos, abre la consola SSH del servidor y dirígete 
 cd /ruta/a/tu/dashboard
 ```
 
-Si estás realizando una actualización visual o de código (como la v1.5), siempre apaga el sistema viejo para liberar recursos y evitar retenciones:
+Si estás realizando una actualización visual o de código, siempre apaga el sistema viejo para liberar recursos y evitar retenciones:
 ```bash
 docker compose down
 ```
@@ -39,7 +39,7 @@ Tras la compilación limpia, arranca el sistema. Como el archivo `docker-compose
 docker compose up -d
 ```
 
-¡Listo! Ingresa a la IP/Dominio de tu servidor en el puerto correcto (ej. `http://herradura.dte-sv.com:8072/dashboard`) y todo estará fluyendo a la perfección.
+¡Listo! Ingresa a la IP/Dominio de tu servidor en el puerto correcto (ej. `http://tu-dominio.com/dashboard` o `http://192.168.1.100:3001`) y todo estará fluyendo a la perfección.
 
 ---
 
