@@ -18,6 +18,9 @@ export function PrintSummary({ reportData, dateFrom, dateTo }: PrintSummaryProps
     const totalBebidas = data.reduce((acc, row) => acc + (row.bebidas || 0), 0)
     const totalPropina = data.reduce((acc, row) => acc + (row.propina || 0), 0)
     const totalOtros = data.reduce((acc, row) => acc + (row.otros || 0), 0)
+
+    const totalEfectivo = data.reduce((acc, row) => acc + (row.restaurante_efectivo || 0), 0)
+    const totalTarjeta = data.reduce((acc, row) => acc + (row.tarjeta || 0), 0)
     
     // 2. Advanced Analytics
     const advanced = reportData.advanced_analytics
@@ -30,10 +33,26 @@ export function PrintSummary({ reportData, dateFrom, dateTo }: PrintSummaryProps
     // 4. Payment methods
     const metodos = reportData.metodos || []
 
+    // 5. Aggregate all Odoo sessions across all rows
+    const todasLasSesiones = data.reduce((acc: any[], row) => {
+        if (row.sesiones) {
+            row.sesiones.forEach((s) => {
+                acc.push({
+                    fecha: row.fecha,
+                    nombre: s.name,
+                    cuentas: s.total_cuentas || 0,
+                    monto: s.total_pagado || 0,
+                    propina: s.propina || 0
+                })
+            })
+        }
+        return acc
+    }, [])
+
     return (
         <div className="w-full">
             {/* Header */}
-            <div className="text-center border-b border-black pb-2 mb-4">
+            <div className="text-center border-b border-black pb-1 mb-3">
                 <h1 className="text-sm font-bold uppercase tracking-wider text-black">Resumen General de Operaciones</h1>
                 <p className="text-[10px] font-medium text-gray-700">
                     Periodo Evaluado: <span className="font-bold">{dateFrom}</span> al <span className="font-bold">{dateTo}</span>
@@ -44,15 +63,15 @@ export function PrintSummary({ reportData, dateFrom, dateTo }: PrintSummaryProps
             </div>
 
             {/* Two Column Content */}
-            <div className="grid grid-cols-2 gap-6 items-start">
+            <div className="grid grid-cols-2 gap-5 items-start">
                 {/* COLUMN 1 */}
-                <div className="space-y-4">
+                <div className="space-y-3.5">
                     {/* Section 1: Resumen General */}
                     <div>
                         <h2 className="text-[9px] font-black uppercase border-b border-black pb-0.5 mb-1 text-gray-800">
                             1. Métricas Generales de Ventas
                         </h2>
-                        <table className="w-full text-left border-collapse text-[9px] text-black">
+                        <table className="w-full text-left border-collapse text-[8.5px] text-black">
                             <tbody>
                                 <tr className="border-b border-gray-200">
                                     <th className="py-0.5 font-medium">Venta Total Acumulada:</th>
@@ -85,8 +104,20 @@ export function PrintSummary({ reportData, dateFrom, dateTo }: PrintSummaryProps
                                     </td>
                                 </tr>
                                 <tr className="border-b border-gray-200">
-                                    <th className="py-0.5 font-medium">Total Propinas:</th>
+                                    <th className="py-0.5 font-medium">Venta Efectivo (POS):</th>
                                     <td className="py-0.5 text-right">
+                                        ${totalEfectivo.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </td>
+                                </tr>
+                                <tr className="border-b border-gray-200">
+                                    <th className="py-0.5 font-medium">Venta Tarjetas (POS):</th>
+                                    <td className="py-0.5 text-right">
+                                        ${totalTarjeta.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </td>
+                                </tr>
+                                <tr className="border-b border-gray-200">
+                                    <th className="py-0.5 font-medium">Total Propinas:</th>
+                                    <td className="py-0.5 text-right font-medium text-green-700">
                                         ${totalPropina.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </td>
                                 </tr>
@@ -146,7 +177,7 @@ export function PrintSummary({ reportData, dateFrom, dateTo }: PrintSummaryProps
                                 </tr>
                             </thead>
                             <tbody>
-                                {usuarios.slice(0, 12).map((u: any, idx: number) => {
+                                {usuarios.slice(0, 10).map((u: any, idx: number) => {
                                     const part = totalVentas > 0 ? (u.ventas / totalVentas) * 100 : 0
                                     return (
                                         <tr key={idx} className="border-b border-gray-100">
@@ -160,10 +191,10 @@ export function PrintSummary({ reportData, dateFrom, dateTo }: PrintSummaryProps
                                         </tr>
                                     )
                                 })}
-                                {usuarios.length > 12 && (
+                                {usuarios.length > 10 && (
                                     <tr>
                                         <td colSpan={3} className="py-0.5 text-center text-[7px] text-gray-500 italic">
-                                            Mostrando {Math.min(12, usuarios.length)} de {usuarios.length} vendedores
+                                            Mostrando {Math.min(10, usuarios.length)} de {usuarios.length} vendedores
                                         </td>
                                     </tr>
                                 )}
@@ -173,13 +204,13 @@ export function PrintSummary({ reportData, dateFrom, dateTo }: PrintSummaryProps
                 </div>
 
                 {/* COLUMN 2 */}
-                <div className="space-y-4">
+                <div className="space-y-3.5">
                     {/* Section 4: Proyecciones */}
                     <div>
                         <h2 className="text-[9px] font-black uppercase border-b border-black pb-0.5 mb-1 text-gray-800">
                             4. Proyecciones Matemáticas de Cierre
                         </h2>
-                        <table className="w-full text-left border-collapse text-[9px] text-black">
+                        <table className="w-full text-left border-collapse text-[8.5px] text-black">
                             <tbody>
                                 <tr className="border-b border-gray-200">
                                     <th className="py-0.5 font-medium">Venta Acumulada en Periodo:</th>
@@ -207,7 +238,7 @@ export function PrintSummary({ reportData, dateFrom, dateTo }: PrintSummaryProps
                                 </tr>
                                 <tr className="border-b border-gray-200">
                                     <th className="py-0.5 font-medium">Proyección Venta Fin de Mes:</th>
-                                    <td className="py-0.5 text-right font-bold">
+                                    <td className="py-0.5 text-right font-bold text-green-700">
                                         ${(proyeccion.venta_proyectada || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </td>
                                 </tr>
@@ -248,6 +279,78 @@ export function PrintSummary({ reportData, dateFrom, dateTo }: PrintSummaryProps
                                         </td>
                                     </tr>
                                 ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Section 6: Registro Diario de Ventas */}
+                    <div>
+                        <h2 className="text-[9px] font-black uppercase border-b border-black pb-0.5 mb-1 text-gray-800">
+                            6. Registro Diario de Ventas (Muestra)
+                        </h2>
+                        <table className="w-full text-left border-collapse text-[8px] text-black">
+                            <thead>
+                                <tr className="border-b border-black">
+                                    <th className="py-0.5 font-bold">Fecha</th>
+                                    <th className="py-0.5 text-right font-bold">Ctas</th>
+                                    <th className="py-0.5 text-right font-bold">Alimentos</th>
+                                    <th className="py-0.5 text-right font-bold">Bebidas</th>
+                                    <th className="py-0.5 text-right font-bold">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {data.slice(0, 8).map((row: any, idx: number) => (
+                                    <tr key={idx} className="border-b border-gray-100">
+                                        <td className="py-0.5 font-medium">{row.fecha}</td>
+                                        <td className="py-0.5 text-right">{row.total_cuentas}</td>
+                                        <td className="py-0.5 text-right">${(row.alimentos || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</td>
+                                        <td className="py-0.5 text-right">${(row.bebidas || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</td>
+                                        <td className="py-0.5 text-right font-semibold">${row.total_pagado.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</td>
+                                    </tr>
+                                ))}
+                                {data.length > 8 && (
+                                    <tr>
+                                        <td colSpan={5} className="py-0.5 text-center text-[7px] text-gray-500 italic">
+                                            Mostrando los primeros 8 de {data.length} días de venta
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Section 7: Registro de Sesiones de Caja */}
+                    <div>
+                        <h2 className="text-[9px] font-black uppercase border-b border-black pb-0.5 mb-1 text-gray-800">
+                            7. Últimas Sesiones de Caja Odoo (Muestra)
+                        </h2>
+                        <table className="w-full text-left border-collapse text-[8px] text-black">
+                            <thead>
+                                <tr className="border-b border-black">
+                                    <th className="py-0.5 font-bold">Fecha</th>
+                                    <th className="py-0.5 font-bold">Sesión</th>
+                                    <th className="py-0.5 text-right font-bold">Ctas</th>
+                                    <th className="py-0.5 text-right font-bold">Venta</th>
+                                    <th className="py-0.5 text-right font-bold">Propina</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {todasLasSesiones.slice(0, 8).map((s: any, idx: number) => (
+                                    <tr key={idx} className="border-b border-gray-100">
+                                        <td className="py-0.5 font-medium">{s.fecha}</td>
+                                        <td className="py-0.5 text-gray-700 truncate max-w-[80px]">{s.nombre}</td>
+                                        <td className="py-0.5 text-right">{s.cuentas}</td>
+                                        <td className="py-0.5 text-right font-semibold">${s.monto.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</td>
+                                        <td className="py-0.5 text-right text-green-700">${s.propina.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</td>
+                                    </tr>
+                                ))}
+                                {todasLasSesiones.length > 8 && (
+                                    <tr>
+                                        <td colSpan={5} className="py-0.5 text-center text-[7px] text-gray-500 italic">
+                                            Mostrando las primeras 8 de {todasLasSesiones.length} sesiones
+                                        </td>
+                                    </tr>
+                                )}
                             </tbody>
                         </table>
                     </div>
