@@ -115,8 +115,15 @@ export default function DashboardPage() {
     const handlePrint = () => {
         const originalTitle = document.title
         document.title = `Resumen General - Herra - ${dateFrom} al ${dateTo}`
-        window.print()
-        document.title = originalTitle
+        
+        // Defer printing slightly to allow Chromium browsers (Chrome/Edge) to register the updated title
+        setTimeout(() => {
+            window.print()
+            // Restore original title after print dialog has loaded
+            setTimeout(() => {
+                document.title = originalTitle
+            }, 500)
+        }, 150)
     }
 
     return (
