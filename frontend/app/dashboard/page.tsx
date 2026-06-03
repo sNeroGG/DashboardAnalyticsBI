@@ -12,10 +12,11 @@ import { UserCharts } from '@/components/dashboard/user-charts'
 import { UserTable } from '@/components/dashboard/user-table'
 import { AdvancedAnalytics } from '@/components/dashboard/advanced-analytics'
 import { MonthComparison } from '@/components/dashboard/month-comparison'
+import { PrintSummary } from '@/components/dashboard/print-summary'
 import { dashboardAPI } from '@/lib/api'
 import type { ReportData, Masters } from '@/lib/types'
 import { Button } from '@/components/ui/button'
-import { LogOut, RefreshCcw, LayoutDashboard, Database, BarChart2, Users, ShoppingBag, Activity } from 'lucide-react'
+import { LogOut, RefreshCcw, LayoutDashboard, Database, BarChart2, Users, ShoppingBag, Activity, FileText } from 'lucide-react'
 
 export default function DashboardPage() {
     const [dateFrom, setDateFrom] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'))
@@ -112,7 +113,8 @@ export default function DashboardPage() {
     }
 
     return (
-        <div className="min-h-screen bg-background p-4 md:p-8 space-y-8 animate-in fade-in duration-500">
+        <>
+            <div className="min-h-screen bg-background p-4 md:p-8 space-y-8 animate-in fade-in duration-500 print:hidden">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
                 <div className="flex items-center gap-3">
@@ -125,6 +127,12 @@ export default function DashboardPage() {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
+                    {reportData && (
+                        <Button variant="outline" size="sm" onClick={() => window.print()} className="gap-2 border-primary/20 hover:bg-primary/10">
+                            <FileText className="h-4 w-4" />
+                            Generar PDF
+                        </Button>
+                    )}
                     <Button variant="outline" size="sm" onClick={() => fetchReport(true)} className="gap-2 border-primary/20 hover:bg-primary/10">
                         <RefreshCcw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
                         Sincronizar
@@ -261,6 +269,12 @@ export default function DashboardPage() {
                     <p className="text-muted-foreground font-medium">Usa los filtros superiores para generar la consulta...</p>
                 </div>
             )}
-        </div>
+            </div>
+            {reportData && (
+                <div className="hidden print:block bg-white text-black p-4 w-full h-full text-[10px] font-sans">
+                    <PrintSummary reportData={reportData} dateFrom={dateFrom} dateTo={dateTo} />
+                </div>
+            )}
+        </>
     )
 }
