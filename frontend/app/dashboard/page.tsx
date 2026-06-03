@@ -112,6 +112,13 @@ export default function DashboardPage() {
         router.push('/login')
     }
 
+    const handlePrint = () => {
+        const originalTitle = document.title
+        document.title = `Resumen General - Herra - ${dateFrom} al ${dateTo}`
+        window.print()
+        document.title = originalTitle
+    }
+
     return (
         <>
             <div className="min-h-screen bg-background p-4 md:p-8 space-y-8 animate-in fade-in duration-500 print:hidden">
@@ -128,7 +135,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex items-center gap-2">
                     {reportData && (
-                        <Button variant="outline" size="sm" onClick={() => window.print()} className="gap-2 border-primary/20 hover:bg-primary/10">
+                        <Button variant="outline" size="sm" onClick={handlePrint} className="gap-2 border-primary/20 hover:bg-primary/10">
                             <FileText className="h-4 w-4" />
                             Generar PDF
                         </Button>
