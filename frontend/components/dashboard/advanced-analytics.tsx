@@ -144,6 +144,7 @@ export function AdvancedAnalytics({ reportData }: AdvancedAnalyticsProps) {
                                     <th className="px-4 py-3">Día</th>
                                     <th className="px-4 py-3 text-right">Promedio Cuentas</th>
                                     <th className="px-4 py-3 text-right">Monto Promedio</th>
+                                    <th className="px-4 py-3 text-right">Monto Total</th>
                                     <th className="px-4 py-3 text-right">Ticket Prom. Persona</th>
                                     <th className="px-4 py-3 text-center">Muestras</th>
                                 </tr>
@@ -159,6 +160,9 @@ export function AdvancedAnalytics({ reportData }: AdvancedAnalyticsProps) {
                                         </td>
                                         <td className="px-4 py-3 text-right font-medium text-primary">
                                             ${dia.promedio_monto.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="px-4 py-3 text-right font-semibold text-foreground">
+                                            ${(dia.monto_total ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </td>
                                         <td className="px-4 py-3 text-right font-bold text-green-500">
                                             ${dia.ticket_promedio_persona.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

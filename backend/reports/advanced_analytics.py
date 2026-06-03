@@ -79,6 +79,7 @@ def calculate_advanced_analytics(daily_data, date_from_str, date_to_str):
             "dia": day_names[i],
             "promedio_tickets": avg_tickets,
             "promedio_monto": avg_monto,
+            "monto_total": st["total_pagado"],
             "ticket_promedio_persona": promedio_persona,
             "dias_contados": count
         })

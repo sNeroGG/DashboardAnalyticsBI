@@ -134,8 +134,14 @@ def get_sales_report():
             with open(cache_file, "r", encoding="utf-8") as f:
                 cached_data = json.load(f)
                 
-                # Retro-compatibilidad: si la caché es vieja y no tiene advanced_analytics, calcularla
-                if "advanced_analytics" not in cached_data:
+                # Retro-compatibilidad: si la caché es vieja, no tiene advanced_analytics o no tiene monto_total, recalculamos
+                has_monto_total = False
+                if "advanced_analytics" in cached_data:
+                    analisis = cached_data["advanced_analytics"].get("analisis_semanal", [])
+                    if analisis and len(analisis) > 0 and "monto_total" in analisis[0]:
+                        has_monto_total = True
+                
+                if "advanced_analytics" not in cached_data or not has_monto_total:
                     cached_data["advanced_analytics"] = calculate_advanced_analytics(cached_data.get("data", []), date_from, date_to)
                     # Opcionalmente guardarlo de nuevo
                     with open(cache_file, "w", encoding="utf-8") as fw:
