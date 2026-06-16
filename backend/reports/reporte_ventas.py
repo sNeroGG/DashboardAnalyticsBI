@@ -58,6 +58,14 @@ def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=
     except Exception:
         pass
 
+    # Detección dinámica del campo de categoría de producto (pos_categ_ids en Odoo 17+ o pos_categ_id en anteriores)
+    product_category_field = "pos_categ_id"
+    try:
+        odoo.search("product.product", [("id", "=", 0)], ["pos_categ_ids"])
+        product_category_field = "pos_categ_ids"
+    except Exception:
+        pass
+
     # Carga de categorías de punto de venta (pos.category)
     categories = []
     try:
@@ -101,9 +109,9 @@ def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=
         lines_records = odoo.search("pos.order.line", [("order_id", "in", order_ids)], ["order_id", "product_id", "price_subtotal_incl"])
         product_ids = list(set(get_id(line.get("product_id")) for line in lines_records if line.get("product_id")))
         if product_ids:
-            products = odoo.search("product.product", [("id", "in", product_ids)], ["id", "pos_categ_id"])
+            products = odoo.search("product.product", [("id", "in", product_ids)], ["id", product_category_field])
             for p in products:
-                product_to_category[p["id"]] = get_id(p.get("pos_categ_id"))
+                product_to_category[p["id"]] = get_id(p.get(product_category_field))
     except Exception as e:
         print(f"Error loading lines/product categories: {e}")
 
