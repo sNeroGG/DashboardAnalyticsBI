@@ -109,9 +109,37 @@ def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=
         lines_records = odoo.search("pos.order.line", [("order_id", "in", order_ids)], ["order_id", "product_id", "price_subtotal_incl"])
         product_ids = list(set(get_id(line.get("product_id")) for line in lines_records if line.get("product_id")))
         if product_ids:
-            products = odoo.search("product.product", [("id", "in", product_ids)], ["id", product_category_field])
-            for p in products:
-                product_to_category[p["id"]] = get_id(p.get(product_category_field))
+            rpc_user = os.environ.get("ODOO_RPC_USER")
+            rpc_key = os.environ.get("ODOO_RPC_KEY")
+            
+            queried_via_rpc = False
+            if rpc_user and rpc_key:
+                try:
+                    import xmlrpc.client
+                    base_url = odoo.url
+                    if base_url.endswith("/api"):
+                        base_url = base_url[:-4]
+                    
+                    common = xmlrpc.client.ServerProxy(f"{base_url}/xmlrpc/2/common")
+                    uid = common.authenticate(odoo.db, rpc_user, rpc_key, {})
+                    if uid:
+                        models = xmlrpc.client.ServerProxy(f"{base_url}/xmlrpc/2/object")
+                        products_data = models.execute_kw(
+                            odoo.db, uid, rpc_key, 
+                            "product.product", "search_read", 
+                            [[("id", "in", product_ids)]], 
+                            {"fields": ["id", "pos_categ_ids"]}
+                        )
+                        for p in products_data:
+                            product_to_category[p["id"]] = get_id(p.get("pos_categ_ids"))
+                        queried_via_rpc = True
+                except Exception as rpc_err:
+                    print(f"Error querying product categories via XML-RPC: {rpc_err}")
+            
+            if not queried_via_rpc:
+                products = odoo.search("product.product", [("id", "in", product_ids)], ["id", product_category_field])
+                for p in products:
+                    product_to_category[p["id"]] = get_id(p.get(product_category_field))
     except Exception as e:
         print(f"Error loading lines/product categories: {e}")
 
