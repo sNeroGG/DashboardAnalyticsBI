@@ -189,9 +189,9 @@ def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=
             group = category_groups.get(cat_id, "Otros") if cat_id else "Otros"
             
             group_lower = str(group).lower()
-            if "alimento" in group_lower or "comida" in group_lower:
+            if group_lower == "food" or "alimento" in group_lower or "comida" in group_lower:
                 o_alimentos += amount
-            elif "bebida" in group_lower or "trago" in group_lower:
+            elif group_lower == "drink" or "bebida" in group_lower or "trago" in group_lower:
                 o_bebidas += amount
             else:
                 o_otros += amount
