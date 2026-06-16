@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Users } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
+import { OdooTooltip } from '@/components/ui/odoo-tooltip'
 
 interface UserTableProps {
     usuarios: any[]
@@ -10,17 +11,19 @@ export function UserTable({ usuarios = [] }: UserTableProps) {
     return (
         <Card>
             <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    Despliegue de Cajeros/Vendedores
-                </CardTitle>
+                <OdooTooltip model="pos.order" field="order_creator_id, order_creator_name" filter="Vendedor que creó el pedido en el punto de venta de Odoo. Tiene fallback al campo user_id (cajero)." className="w-fit">
+                    <CardTitle className="flex items-center gap-2 cursor-help">
+                        <Users className="h-5 w-5" />
+                        Despliegue de Vendedores / Cajeros
+                    </CardTitle>
+                </OdooTooltip>
             </CardHeader>
             <CardContent>
                 <div className="overflow-x-auto">
                     <table className="w-full">
                         <thead>
                             <tr className="border-b border-border">
-                                <th className="px-4 py-3 text-left text-sm font-semibold">Cajero / Usuario</th>
+                                <th className="px-4 py-3 text-left text-sm font-semibold">Vendedor / Cajero</th>
                                 <th className="px-4 py-3 text-right text-sm font-semibold">Cuentas Cobradas</th>
                                 <th className="px-4 py-3 text-right text-sm font-semibold">Ventas Acumuladas</th>
                             </tr>

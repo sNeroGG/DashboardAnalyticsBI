@@ -72,12 +72,12 @@ export function ChartsSection({ data }: ChartsSectionProps) {
             <div className="grid gap-4 md:grid-cols-2">
                 <Card>
                     <CardHeader>
-                        <OdooTooltip model="pos.order" field="Calculado" filter="Proporciones sobre el monto gastable" className="w-fit">
-                            <CardTitle className="flex items-center gap-2 cursor-help">
-                                <PieChartIcon className="h-5 w-5" />
-                                Distribución de Consumo
-                            </CardTitle>
-                        </OdooTooltip>
+                    <OdooTooltip model="pos.category" field="product_group" filter="Venta real agrupada por el campo 'product_group' en las categorías del punto de venta en Odoo." className="w-fit">
+                        <CardTitle className="flex items-center gap-2 cursor-help">
+                            <PieChartIcon className="h-5 w-5" />
+                            Distribución de Consumo
+                        </CardTitle>
+                    </OdooTooltip>
                     </CardHeader>
                     <CardContent>
                         <ResponsiveContainer width="100%" height={280}>

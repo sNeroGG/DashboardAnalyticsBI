@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { Users, FileText } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
+import { OdooTooltip } from '@/components/ui/odoo-tooltip'
 
 interface UserChartsProps {
     usuarios: any[]
@@ -25,10 +26,12 @@ export function UserCharts({ usuarios = [] }: UserChartsProps) {
         <div className="grid gap-4 md:grid-cols-2">
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Users className="h-5 w-5" />
-                        Ingresos por Cajero
-                    </CardTitle>
+                    <OdooTooltip model="pos.order" field="order_creator_id, order_creator_name" filter="Vendedor que creó el pedido en el punto de venta de Odoo. Tiene fallback al campo user_id (cajero)." className="w-fit">
+                        <CardTitle className="flex items-center gap-2 cursor-help">
+                            <Users className="h-5 w-5" />
+                            Ingresos por Vendedor
+                        </CardTitle>
+                    </OdooTooltip>
                 </CardHeader>
                 <CardContent>
                     <ResponsiveContainer width="100%" height={320}>
@@ -71,10 +74,12 @@ export function UserCharts({ usuarios = [] }: UserChartsProps) {
 
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <FileText className="h-5 w-5 text-primary" />
-                        Cuentas Operadas (Volumen)
-                    </CardTitle>
+                    <OdooTooltip model="pos.order" field="order_creator_id, order_creator_name" filter="Vendedor que creó el pedido en el punto de venta de Odoo. Tiene fallback al campo user_id (cajero)." className="w-fit">
+                        <CardTitle className="flex items-center gap-2 cursor-help">
+                            <FileText className="h-5 w-5 text-primary" />
+                            Cuentas por Vendedor (Volumen)
+                        </CardTitle>
+                    </OdooTooltip>
                 </CardHeader>
                 <CardContent>
                     <ResponsiveContainer width="100%" height={320}>

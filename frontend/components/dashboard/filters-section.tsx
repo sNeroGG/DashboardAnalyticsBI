@@ -78,6 +78,7 @@ export function FiltersSection({
             if (selectedUsers.length > 0) onUsersChange([])
             if (selectedPayments.length > 0) onPaymentsChange([])
             if (selectedStates.length > 0) onStatesChange([])
+            if (selectedProductGroups.length > 0) onProductGroupsChange([])
         }
     }, [activeTab])
 
@@ -151,6 +152,15 @@ export function FiltersSection({
     const toMonthNum = dateTo.split('-')[1]
     const toMonthName = months.find(m => m.id === toMonthNum)?.name
 
+    // Extraer grupos de productos únicos de las categorías de TPV en masters
+    const productGroups = useMemo(() => {
+        const categories = masters?.['pos.category'] || []
+        const groups = categories
+            .map((c: any) => c.product_group)
+            .filter(Boolean) as string[]
+        return Array.from(new Set(groups)).sort()
+    }, [masters])
+
     const evaluationText = useMemo(() => {
         if (activeTab === 'comparativa') {
             const m1 = dateFrom.substring(0, 7)
@@ -183,9 +193,12 @@ export function FiltersSection({
                 base += ` • Del usuario(s): ${names}`
             }
         }
+        if (selectedProductGroups.length > 0) {
+            base += ` • Grupos: ${selectedProductGroups.join(', ')}`
+        }
         
         return base
-    }, [dateFrom, dateTo, queryMode, selectedYear, currentMonthName, selectedUsers, masters, activeTab])
+    }, [dateFrom, dateTo, queryMode, selectedYear, currentMonthName, selectedUsers, selectedProductGroups, masters, activeTab])
 
 
     return (
@@ -328,9 +341,9 @@ export function FiltersSection({
                             <div className="h-px w-full bg-border/40 mb-4" />
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-left">
                                 <div className="space-y-1.5 relative">
-                                    <Label className="text-[9px] uppercase font-bold text-muted-foreground tracking-widest pl-1">Usuarios / Cajeros</Label>
+                                    <Label className="text-[9px] uppercase font-bold text-muted-foreground tracking-widest pl-1">Vendedores / Cajeros</Label>
                                     <div onClick={() => toggleDropdown('users')} className={`flex h-9 w-full cursor-pointer items-center justify-between rounded border px-3 py-2 text-[10px] ${selectedUsers.length > 0 ? 'border-primary bg-primary/5' : 'bg-background'}`}>
-                                        <span className="truncate">{selectedUsers.length > 0 ? `${selectedUsers.length} Seleccionados` : 'Todos los Usuarios'}</span>
+                                        <span className="truncate">{selectedUsers.length > 0 ? `${selectedUsers.length} Seleccionados` : 'Todos los Vendedores'}</span>
                                         <ChevronDown className="h-3 w-3 opacity-50" />
                                     </div>
                                     {openDropdown === 'users' && (
@@ -380,8 +393,26 @@ export function FiltersSection({
                                         </div>
                                     )}
                                 </div>
-                                <div className="flex h-9 items-end justify-end px-2 italic text-[9px] text-muted-foreground/50">
-                                    * Filtros avanzados integrados por AI
+
+                                <div className="space-y-1.5 relative">
+                                    <Label className="text-[9px] uppercase font-bold text-muted-foreground tracking-widest pl-1">Grupos de Producto</Label>
+                                    <div onClick={() => toggleDropdown('groups')} className={`flex h-9 w-full cursor-pointer items-center justify-between rounded border px-3 py-2 text-[10px] ${selectedProductGroups.length > 0 ? 'border-primary bg-primary/5' : 'bg-background'}`}>
+                                        <span className="truncate">{selectedProductGroups.length > 0 ? `${selectedProductGroups.length} Seleccionados` : 'Todos los Grupos'}</span>
+                                        <ChevronDown className="h-3 w-3 opacity-50" />
+                                    </div>
+                                    {openDropdown === 'groups' && (
+                                        <div className="absolute z-50 mt-1 max-h-48 w-56 overflow-auto rounded border bg-popover p-1 shadow-2xl right-0 lg:left-0 text-[10px]">
+                                            {productGroups.map(group => (
+                                                <label key={group} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 hover:bg-accent">
+                                                    <input type="checkbox" checked={selectedProductGroups.includes(group)} onChange={() => onProductGroupsChange(selectedProductGroups.includes(group) ? selectedProductGroups.filter(g => g !== group) : [...selectedProductGroups, group])} className="h-3 w-3" />
+                                                    <span className="truncate">{group}</span>
+                                                </label>
+                                            ))}
+                                            {productGroups.length === 0 && (
+                                                <div className="p-2 text-center text-muted-foreground italic">No hay grupos de categoría cargados.</div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>

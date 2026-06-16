@@ -186,7 +186,7 @@ export default function DashboardPage() {
                     className={`px-4 py-2 text-sm font-bold tracking-widest uppercase transition-colors rounded-t-md flex items-center gap-2 whitespace-nowrap ${activeTab === 'users' ? 'bg-primary/10 text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'}`}
                 >
                     <Users className="h-4 w-4" />
-                    Ventas por Usuario
+                    Ventas por Vendedor
                 </button>
                 <button
                     onClick={() => setActiveTab('purchases')}
