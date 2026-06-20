@@ -79,15 +79,10 @@ export function PaymentMethods({ reportData, masters, selectedPayments }: Paymen
 
     // Categorization logic
     const getCategory = (metodo: string, id: number | null) => {
-        const nameLower = (metodo || '').toLowerCase();
+        const nameLower = (metodo || '').toLowerCase().trim();
         
-        // Remove accents for robust Spanish matching
+        // 1. Check for Tarjeta (Card) keywords or ID 2
         const normalized = nameLower.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        
-        if (normalized.includes('efectivo')) {
-            return 'efectivo';
-        }
-        
         if (
             normalized.includes('tarjeta') ||
             normalized.includes('card') ||
@@ -101,6 +96,20 @@ export function PaymentMethods({ reportData, masters, selectedPayments }: Paymen
             return 'tarjeta';
         }
         
+        // 2. Check for Efectivo (Cash) keywords
+        if (normalized.includes('efectivo')) {
+            return 'efectivo';
+        }
+
+        // 3. If it's a fallback placeholder name (e.g. "metodo 4", "metodo 5", "4", "5")
+        // we classify it as 'efectivo' because the backend treats everything except ID 2
+        // as Cash (restaurante_efectivo).
+        const isPlaceholder = nameLower.startsWith('metodo') || /^\d+$/.test(nameLower);
+        if (isPlaceholder) {
+            return 'efectivo';
+        }
+        
+        // 4. Any other specific name goes to Otros
         return 'otros';
     }
 
