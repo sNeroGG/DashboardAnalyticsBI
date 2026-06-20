@@ -38,6 +38,25 @@ odoo = OdooClient(
     api_key=settings.ODOO_API_KEY
 )
 
+# Cargar catálogos en segundo plano si la caché está vacía o no existe
+try:
+    cache_path = settings.get_master_cache_path()
+    needs_load = True
+    if os.path.exists(cache_path):
+        with open(cache_path, "r", encoding="utf-8") as f:
+            masters_data = json.load(f)
+        # Si ya tiene métodos de pago guardados, asumimos que no está vacío
+        if masters_data.get("pos.payment.method") and len(masters_data["pos.payment.method"]) > 0:
+            needs_load = False
+    
+    if needs_load:
+        print("[BI SERVICE] La caché de maestros está vacía o no existe. Cargando de Odoo en segundo plano...")
+        from masters_loader import load_masters
+        import threading
+        threading.Thread(target=load_masters, daemon=True).start()
+except Exception as e:
+    print(f"[BI SERVICE] Error al planificar la auto-carga de maestros: {e}")
+
 @app.route("/api/auth/login", methods=["POST"])
 def login():
     try:
@@ -154,6 +173,15 @@ def get_sales_report():
             odoo, odoo_from, odoo_to,
             users=users, payments=payments, groups=groups, states=states
         )
+        
+        # Si se solicita refresco forzado, actualizar los maestros también en segundo plano
+        if force_refresh:
+            try:
+                from masters_loader import load_masters
+                import threading
+                threading.Thread(target=load_masters, daemon=True).start()
+            except Exception as e:
+                print(f"[BI SERVICE] Error al sincronizar maestros en segundo plano: {e}")
         
         # Calcular Analítica Avanzada
         advanced_data = calculate_advanced_analytics(report_data.get("data", []), date_from, date_to)

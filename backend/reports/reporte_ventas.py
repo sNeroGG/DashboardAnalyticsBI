@@ -254,8 +254,13 @@ def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=
              summary_metodos[pm_name] = summary_metodos.get(pm_name, 0.0) + o_total
         else:
             for pr in o_pays:
-                pm_id = str(get_id(pr.get("payment_method_id")))
-                pm_name = payment_map.get(pm_id, f"Metodo {pm_id}")
+                pm_val = pr.get("payment_method_id")
+                pm_id = str(get_id(pm_val))
+                pm_name = payment_map.get(pm_id)
+                if not pm_name and isinstance(pm_val, (list, tuple)) and len(pm_val) > 1 and isinstance(pm_val[1], str):
+                    pm_name = pm_val[1]
+                if not pm_name:
+                    pm_name = f"Metodo {pm_id}"
                 pm_amount = pr.get("amount", 0.0)
                 summary_metodos[pm_name] = summary_metodos.get(pm_name, 0.0) + pm_amount
                 if pm_id == "2":

@@ -95,7 +95,7 @@ export function PaymentMethods({ reportData, masters, selectedPayments }: Paymen
                                     <td className="px-4 py-3 text-sm font-medium text-slate-200">
                                         {m.metodo}
                                     </td>
-                                    <td className={`px-4 py-3 text-right text-sm font-bold ${m.monto > 0 ? 'text-primary' : 'text-slate-600'}`}>
+                                    <td className={`px-4 py-3 text-right text-sm font-bold ${m.monto > 0 ? 'text-emerald-400' : 'text-slate-600'}`}>
                                         {formatCurrency(m.monto)}
                                     </td>
                                 </tr>

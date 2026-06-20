@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { format, startOfMonth } from 'date-fns'
 import { FiltersSection } from '@/components/dashboard/filters-section'
@@ -40,6 +40,8 @@ export default function DashboardPage() {
     const [activeSessions, setActiveSessions] = useState<ActiveSession[] | null>(null)
     const [isActiveSession, setIsActiveSession] = useState(true)
     const [isActiveSessionLoading, setIsActiveSessionLoading] = useState(false)
+    const [selectedActiveSessionIds, setSelectedActiveSessionIds] = useState<number[]>([])
+    const [selectedActiveStates, setSelectedActiveStates] = useState<string[]>(['draft', 'paid', 'done', 'invoiced', 'cancel'])
 
     const router = useRouter()
 
@@ -71,16 +73,20 @@ export default function DashboardPage() {
         try {
             const { data } = await dashboardAPI.getActiveSessions()
             if (data.status === 'success') {
-                setActiveSessions(data.sessions || [])
+                const sessionsList = data.sessions || []
+                setActiveSessions(sessionsList)
                 setIsActiveSession(data.is_active ?? true)
+                setSelectedActiveSessionIds(sessionsList.map((s: any) => s.id))
             } else {
                 setActiveSessions([])
                 setIsActiveSession(true)
+                setSelectedActiveSessionIds([])
             }
         } catch (error) {
             console.error('Error fetching active sessions', error)
             setActiveSessions([])
             setIsActiveSession(true)
+            setSelectedActiveSessionIds([])
         } finally {
             setIsActiveSessionLoading(false)
         }
@@ -148,7 +154,7 @@ export default function DashboardPage() {
     const handlePrint = () => {
         const originalTitle = document.title
         document.title = `Resumen General - Herra - ${dateFrom} al ${dateTo}`
-        
+
         // Defer printing slightly to allow Chromium browsers (Chrome/Edge) to register the updated title
         setTimeout(() => {
             window.print()
@@ -162,10 +168,10 @@ export default function DashboardPage() {
     const handleActiveSessionPrint = () => {
         const originalTitle = document.title
         const dateStr = format(new Date(), 'yyyy-MM-dd')
-        document.title = isActiveSession 
+        document.title = isActiveSession
             ? `Sesiones Activas - Herra - ${dateStr}`
             : `Ultimas Sesiones Activas - Herra - ${dateStr}`
-        
+
         setTimeout(() => {
             window.print()
             setTimeout(() => {
@@ -174,180 +180,200 @@ export default function DashboardPage() {
         }, 150)
     }
 
+    const filteredActiveSessions = useMemo(() => {
+        if (!activeSessions) return []
+        
+        const matchedSessions = activeSessions.filter(s => 
+            selectedActiveSessionIds.includes(s.id)
+        )
+        
+        return matchedSessions.map(s => ({
+            ...s,
+            cuentas: (s.cuentas || []).filter(c => 
+                selectedActiveStates.includes(c.estado || '')
+            )
+        }))
+    }, [activeSessions, selectedActiveSessionIds, selectedActiveStates])
+
     return (
         <>
             <div className="min-h-screen bg-background p-4 md:p-8 space-y-8 animate-in fade-in duration-500 print:hidden">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
-                <div className="flex items-center gap-3">
-                    <div className="bg-primary/20 p-2 rounded-xl border border-primary/30">
-                        <LayoutDashboard className="h-8 w-8 text-primary" />
+                {/* Header */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
+                    <div className="flex items-center gap-3">
+                        <div className="bg-primary/20 p-2 rounded-xl border border-primary/30">
+                            <LayoutDashboard className="h-8 w-8 text-primary" />
+                        </div>
+                        <div>
+                            <h1 className="text-3xl font-black text-foreground tracking-tighter italic">BI ANALYTICS <span className="text-primary font-normal not-italic">Odoo v2.1</span></h1>
+                            <p className="text-sm text-muted-foreground font-medium">Panel de Control Estratégico Herradura</p>
+                        </div>
                     </div>
-                    <div>
-                        <h1 className="text-3xl font-black text-foreground tracking-tighter italic">BI ANALYTICS <span className="text-primary font-normal not-italic">Odoo v1.6</span></h1>
-                        <p className="text-sm text-muted-foreground font-medium">Panel de Control Estratégico Herradura</p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-2">
-                    {reportData && (
-                        <Button variant="outline" size="sm" onClick={handlePrint} className="gap-2 border-primary/20 hover:bg-primary/10">
-                            <FileText className="h-4 w-4" />
-                            Generar PDF
+                    <div className="flex items-center gap-2">
+                        {reportData && (
+                            <Button variant="outline" size="sm" onClick={handlePrint} className="gap-2 border-primary/20 hover:bg-primary/10">
+                                <FileText className="h-4 w-4" />
+                                Generar PDF
+                            </Button>
+                        )}
+                        <Button variant="outline" size="sm" onClick={() => fetchReport(true)} className="gap-2 border-primary/20 hover:bg-primary/10">
+                            <RefreshCcw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                            Sincronizar
                         </Button>
-                    )}
-                    <Button variant="outline" size="sm" onClick={() => fetchReport(true)} className="gap-2 border-primary/20 hover:bg-primary/10">
-                        <RefreshCcw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-                        Sincronizar
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={handleLogout} className="text-destructive hover:bg-destructive/10">
-                        <LogOut className="mr-2 h-4 w-4" />
-                        Salir
-                    </Button>
+                        <Button variant="ghost" size="sm" onClick={handleLogout} className="text-destructive hover:bg-destructive/10">
+                            <LogOut className="mr-2 h-4 w-4" />
+                            Salir
+                        </Button>
+                    </div>
                 </div>
-            </div>
 
-            {/* Navigation Tabs */}
-            <div className="flex space-x-2 border-b border-border/50 pb-2 overflow-x-auto scrollbar-hide">
-                <button
-                    onClick={() => setActiveTab('dashboard')}
-                    className={`px-4 py-2 text-sm font-bold tracking-widest uppercase transition-colors rounded-t-md flex items-center gap-2 whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-primary/10 text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'}`}
-                >
-                    <BarChart2 className="h-4 w-4" />
-                    Dashboard
-                </button>
-                <button
-                    onClick={() => setActiveTab('analitica')}
-                    className={`px-4 py-2 text-sm font-bold tracking-widest uppercase transition-colors rounded-t-md flex items-center gap-2 whitespace-nowrap ${activeTab === 'analitica' ? 'bg-primary/10 text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'}`}
-                >
-                    <Activity className="h-4 w-4" />
-                    Analitica
-                </button>
-                <button
-                    onClick={() => setActiveTab('active_session')}
-                    className={`px-4 py-2 text-sm font-bold tracking-widest uppercase transition-colors rounded-t-md flex items-center gap-2 whitespace-nowrap ${activeTab === 'active_session' ? 'bg-primary/10 text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'}`}
-                >
-                    <Clock className="h-4 w-4" />
-                    Sesión Activa
-                </button>
-                <button
-                    onClick={() => setActiveTab('comparativa')}
-                    className={`px-4 py-2 text-sm font-bold tracking-widest uppercase transition-colors rounded-t-md flex items-center gap-2 whitespace-nowrap ${activeTab === 'comparativa' ? 'bg-primary/10 text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'}`}
-                >
-                    <BarChart2 className="h-4 w-4" />
-                    Comparativa
-                </button>
-                <button
-                    onClick={() => setActiveTab('users')}
-                    className={`px-4 py-2 text-sm font-bold tracking-widest uppercase transition-colors rounded-t-md flex items-center gap-2 whitespace-nowrap ${activeTab === 'users' ? 'bg-primary/10 text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'}`}
-                >
-                    <Users className="h-4 w-4" />
-                    Ventas por Vendedor
-                </button>
-                <button
-                    onClick={() => setActiveTab('purchases')}
-                    className={`px-4 py-2 text-sm font-bold tracking-widest uppercase transition-colors rounded-t-md flex items-center gap-2 whitespace-nowrap ${activeTab === 'purchases' ? 'bg-primary/10 text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'}`}
-                >
-                    <ShoppingBag className="h-4 w-4" />
-                    Compras por proveedor
-                </button>
-            </div>
+                {/* Navigation Tabs */}
+                <div className="flex space-x-2 border-b border-border/50 pb-2 overflow-x-auto scrollbar-hide">
+                    <button
+                        onClick={() => setActiveTab('dashboard')}
+                        className={`px-4 py-2 text-sm font-bold tracking-widest uppercase transition-colors rounded-t-md flex items-center gap-2 whitespace-nowrap ${activeTab === 'dashboard' ? 'bg-primary/10 text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'}`}
+                    >
+                        <BarChart2 className="h-4 w-4" />
+                        Dashboard
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('analitica')}
+                        className={`px-4 py-2 text-sm font-bold tracking-widest uppercase transition-colors rounded-t-md flex items-center gap-2 whitespace-nowrap ${activeTab === 'analitica' ? 'bg-primary/10 text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'}`}
+                    >
+                        <Activity className="h-4 w-4" />
+                        Analitica
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('active_session')}
+                        className={`px-4 py-2 text-sm font-bold tracking-widest uppercase transition-colors rounded-t-md flex items-center gap-2 whitespace-nowrap ${activeTab === 'active_session' ? 'bg-primary/10 text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'}`}
+                    >
+                        <Clock className="h-4 w-4" />
+                        Sesión Activa
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('comparativa')}
+                        className={`px-4 py-2 text-sm font-bold tracking-widest uppercase transition-colors rounded-t-md flex items-center gap-2 whitespace-nowrap ${activeTab === 'comparativa' ? 'bg-primary/10 text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'}`}
+                    >
+                        <BarChart2 className="h-4 w-4" />
+                        Comparativa
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('users')}
+                        className={`px-4 py-2 text-sm font-bold tracking-widest uppercase transition-colors rounded-t-md flex items-center gap-2 whitespace-nowrap ${activeTab === 'users' ? 'bg-primary/10 text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'}`}
+                    >
+                        <Users className="h-4 w-4" />
+                        Ventas por Vendedor
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('purchases')}
+                        className={`px-4 py-2 text-sm font-bold tracking-widest uppercase transition-colors rounded-t-md flex items-center gap-2 whitespace-nowrap ${activeTab === 'purchases' ? 'bg-primary/10 text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'}`}
+                    >
+                        <ShoppingBag className="h-4 w-4" />
+                        Compras por proveedor
+                    </button>
+                </div>
 
-            {/* Filters */}
-            {activeTab !== 'active_session' && (
-                <FiltersSection
-                    activeTab={activeTab}
-                    dateFrom={dateFrom}
-                    dateTo={dateTo}
-                    compareDateFrom={compareDateFrom}
-                    compareDateTo={compareDateTo}
-                    selectedUsers={selectedUsers}
-                    selectedPayments={selectedPayments}
-                    selectedProductGroups={selectedProductGroups}
-                    selectedStates={selectedStates}
-                    masters={masters}
-                    odooStates={odooStates}
-                    onDateFromChange={setDateFrom}
-                    onDateToChange={setDateTo}
-                    onCompareDateFromChange={setCompareDateFrom}
-                    onCompareDateToChange={setCompareDateTo}
-                    onUsersChange={setSelectedUsers}
-                    onPaymentsChange={setSelectedPayments}
-                    onProductGroupsChange={setSelectedProductGroups}
-                    onStatesChange={setSelectedStates}
-                    onFetchReport={fetchReport}
-                    isLoading={isLoading}
-                />
-            )}
+                {/* Filters */}
+                {activeTab !== 'active_session' && (
+                    <FiltersSection
+                        activeTab={activeTab}
+                        dateFrom={dateFrom}
+                        dateTo={dateTo}
+                        compareDateFrom={compareDateFrom}
+                        compareDateTo={compareDateTo}
+                        selectedUsers={selectedUsers}
+                        selectedPayments={selectedPayments}
+                        selectedProductGroups={selectedProductGroups}
+                        selectedStates={selectedStates}
+                        masters={masters}
+                        odooStates={odooStates}
+                        onDateFromChange={setDateFrom}
+                        onDateToChange={setDateTo}
+                        onCompareDateFromChange={setCompareDateFrom}
+                        onCompareDateToChange={setCompareDateTo}
+                        onUsersChange={setSelectedUsers}
+                        onPaymentsChange={setSelectedPayments}
+                        onProductGroupsChange={setSelectedProductGroups}
+                        onStatesChange={setSelectedStates}
+                        onFetchReport={fetchReport}
+                        isLoading={isLoading}
+                    />
+                )}
 
-            {activeTab === 'active_session' ? (
-                <ActiveSessionView 
-                    sessions={activeSessions} 
-                    isActive={isActiveSession}
-                    isLoading={isActiveSessionLoading} 
-                    onRefresh={fetchActiveSessions} 
-                    onPrint={handleActiveSessionPrint}
-                />
-            ) : reportData && (activeTab !== 'comparativa' || compareReportData) ? (
-                <>
-                    {/* DASHBOARD TAB CONTENT */}
-                    {activeTab === 'dashboard' && (
-                        <div className="space-y-8 animate-in fade-in duration-500">
-                            <StatsCards data={reportData.data || []} />
+                {activeTab === 'active_session' ? (
+                    <ActiveSessionView 
+                        sessions={activeSessions} 
+                        filteredSessions={filteredActiveSessions}
+                        isActive={isActiveSession}
+                        isLoading={isActiveSessionLoading} 
+                        onRefresh={fetchActiveSessions} 
+                        onPrint={handleActiveSessionPrint}
+                        selectedSessionIds={selectedActiveSessionIds}
+                        onSelectedSessionIdsChange={setSelectedActiveSessionIds}
+                        selectedStates={selectedActiveStates}
+                        onSelectedStatesChange={setSelectedActiveStates}
+                    />
+                ) : reportData && (activeTab !== 'comparativa' || compareReportData) ? (
+                    <>
+                        {/* DASHBOARD TAB CONTENT */}
+                        {activeTab === 'dashboard' && (
+                            <div className="space-y-8 animate-in fade-in duration-500">
+                                <StatsCards data={reportData.data || []} />
 
-                            <div className="flex flex-col gap-8">
+                                <div className="flex flex-col gap-8">
+                                    <div className="w-full">
+                                        <ChartsSection data={reportData.data || []} />
+                                    </div>
+                                    <div className="w-full">
+                                        <PaymentMethods
+                                            reportData={reportData}
+                                            masters={masters!}
+                                            selectedPayments={selectedPayments}
+                                        />
+                                    </div>
+                                </div>
+
+                                <DataTable data={reportData.data || []} />
+                            </div>
+                        )}
+
+                        {/* ANALITICA TAB CONTENT */}
+                        {activeTab === 'analitica' && (
+                            <AdvancedAnalytics reportData={reportData} />
+                        )}
+
+                        {/* COMPARATIVA TAB CONTENT */}
+                        {activeTab === 'comparativa' && compareReportData && (
+                            <MonthComparison baseData={reportData} compareData={compareReportData} />
+                        )}
+
+                        {/* USERS TAB CONTENT */}
+                        {activeTab === 'users' && (
+                            <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
                                 <div className="w-full">
-                                    <ChartsSection data={reportData.data || []} />
+                                    <UserCharts usuarios={reportData.usuarios || []} />
                                 </div>
                                 <div className="w-full">
-                                    <PaymentMethods
-                                        reportData={reportData}
-                                        masters={masters!}
-                                        selectedPayments={selectedPayments}
-                                    />
+                                    <UserTable usuarios={reportData.usuarios || []} />
                                 </div>
                             </div>
+                        )}
 
-                            <DataTable data={reportData.data || []} />
-                        </div>
-                    )}
-
-                    {/* ANALITICA TAB CONTENT */}
-                    {activeTab === 'analitica' && (
-                        <AdvancedAnalytics reportData={reportData} />
-                    )}
-
-                    {/* COMPARATIVA TAB CONTENT */}
-                    {activeTab === 'comparativa' && compareReportData && (
-                        <MonthComparison baseData={reportData} compareData={compareReportData} />
-                    )}
-
-                    {/* USERS TAB CONTENT */}
-                    {activeTab === 'users' && (
-                        <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
-                            <div className="w-full">
-                                <UserCharts usuarios={reportData.usuarios || []} />
+                        {/* PURCHASES TAB CONTENT */}
+                        {activeTab === 'purchases' && (
+                            <div className="animate-in fade-in slide-in-from-right-4 duration-500 h-64 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl bg-muted/30">
+                                <ShoppingBag className="h-12 w-12 text-muted-foreground mb-4" />
+                                <h3 className="text-xl font-bold text-foreground mb-2">Sección en Construcción</h3>
+                                <p className="text-muted-foreground font-medium">Las compras acumuladas por proveedor estarán disponibles pronto.</p>
                             </div>
-                            <div className="w-full">
-                                <UserTable usuarios={reportData.usuarios || []} />
-                            </div>
-                        </div>
-                    )}
-
-                    {/* PURCHASES TAB CONTENT */}
-                    {activeTab === 'purchases' && (
-                        <div className="animate-in fade-in slide-in-from-right-4 duration-500 h-64 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl bg-muted/30">
-                            <ShoppingBag className="h-12 w-12 text-muted-foreground mb-4" />
-                            <h3 className="text-xl font-bold text-foreground mb-2">Sección en Construcción</h3>
-                            <p className="text-muted-foreground font-medium">Las compras acumuladas por proveedor estarán disponibles pronto.</p>
-                        </div>
-                    )}
-                </>
-            ) : (
-                <div className="h-64 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl bg-muted/30">
-                    <Database className="h-12 w-12 text-muted-foreground animate-pulse mb-4" />
-                    <p className="text-muted-foreground font-medium">Usa los filtros superiores para generar la consulta...</p>
-                </div>
-            )}
+                        )}
+                    </>
+                ) : (
+                    <div className="h-64 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl bg-muted/30">
+                        <Database className="h-12 w-12 text-muted-foreground animate-pulse mb-4" />
+                        <p className="text-muted-foreground font-medium">Usa los filtros superiores para generar la consulta...</p>
+                    </div>
+                )}
             </div>
             {activeTab === 'active_session' && activeSessions ? (
                 <div className="hidden print:block bg-white text-black p-4 w-full h-full text-[10px] font-sans">
