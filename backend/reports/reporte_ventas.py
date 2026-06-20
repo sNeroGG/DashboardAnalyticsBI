@@ -420,7 +420,7 @@ def generate_active_sessions_report(odoo):
             users_data = odoo.search("res.users", [("id", "in", list(set(user_ids)))], ["id", "login", "name", "partner_id"])
             for u in users_data:
                 u_id = u["id"]
-                u_name = u.get("login") or u.get("name")
+                u_name = u.get("name") or u.get("login")
                 if not u_name and "partner_id" in u:
                     pid = u["partner_id"]
                     if isinstance(pid, list) and len(pid) > 1:
@@ -509,7 +509,7 @@ def generate_active_sessions_report(odoo):
         s_id = s["id"]
         s_user = s.get("user_id")
         
-        # Extracción súper-robusta de nombre de usuario del cajero (priorizando login/username real de la base de datos)
+        # Extracción súper-robusta de nombre del cajero (priorizando el name/display name real de la base de datos)
         cashier_name = None
         uid = get_id(s_user)
         if uid:
