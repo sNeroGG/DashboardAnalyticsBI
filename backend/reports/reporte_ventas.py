@@ -407,6 +407,30 @@ def generate_active_sessions_report(odoo):
     if not sessions:
         return {"status": "success", "sessions": []}
 
+    # Cargar nombres de usuarios en tiempo real para evitar "Cajero Desconocido"
+    user_ids = []
+    for s in sessions:
+        uid = get_id(s.get("user_id"))
+        if uid:
+            user_ids.append(uid)
+            
+    real_users = {}
+    if user_ids:
+        try:
+            users_data = odoo.search("res.users", [("id", "in", list(set(user_ids)))], ["id", "name", "partner_id"])
+            for u in users_data:
+                u_id = u["id"]
+                u_name = u.get("name")
+                if not u_name and "partner_id" in u:
+                    pid = u["partner_id"]
+                    if isinstance(pid, list) and len(pid) > 1:
+                        u_name = pid[1]
+                    elif isinstance(pid, dict) and "name" in pid:
+                        u_name = pid["name"]
+                real_users[str(u_id)] = u_name or f"Usuario {u_id}"
+        except Exception as e:
+            print(f"Error querying active sessions user names: {e}")
+
     session_ids = [s["id"] for s in sessions]
     
     # Buscar órdenes de estas sesiones
@@ -484,7 +508,19 @@ def generate_active_sessions_report(odoo):
     for s in sessions:
         s_id = s["id"]
         s_user = s.get("user_id")
-        cashier_name = s_user[1] if isinstance(s_user, list) and len(s_user) > 1 else (user_map.get(str(get_id(s_user))) or "Cajero Desconocido")
+        
+        # Extracción súper-robusta de nombre del cajero
+        cashier_name = None
+        if s_user:
+            if isinstance(s_user, (list, tuple)) and len(s_user) > 1 and isinstance(s_user[1], str):
+                cashier_name = s_user[1]
+            else:
+                uid = get_id(s_user)
+                if uid:
+                    cashier_name = real_users.get(str(uid)) or user_map.get(str(uid)) or f"Usuario {uid}"
+                    
+        if not cashier_name:
+            cashier_name = "Cajero Desconocido"
         
         session_reports[s_id] = {
             "id": s_id,
