@@ -170,6 +170,18 @@ def get_sales_report():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+@app.route("/api/bi/report/active-sessions", methods=["GET"])
+@jwt_required()
+def get_active_sessions_report():
+    try:
+        report_data = reporte_ventas.generate_active_sessions_report(odoo)
+        return jsonify(report_data)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
 if __name__ == "__main__":
     print("\n" + "="*60)
     if DEV_MODE:

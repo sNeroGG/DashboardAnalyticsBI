@@ -13,10 +13,11 @@ import { UserTable } from '@/components/dashboard/user-table'
 import { AdvancedAnalytics } from '@/components/dashboard/advanced-analytics'
 import { MonthComparison } from '@/components/dashboard/month-comparison'
 import { PrintSummary } from '@/components/dashboard/print-summary'
+import { ActiveSessionView } from '@/components/dashboard/active-session-view'
 import { dashboardAPI } from '@/lib/api'
-import type { ReportData, Masters } from '@/lib/types'
+import type { ReportData, Masters, ActiveSession } from '@/lib/types'
 import { Button } from '@/components/ui/button'
-import { LogOut, RefreshCcw, LayoutDashboard, Database, BarChart2, Users, ShoppingBag, Activity, FileText } from 'lucide-react'
+import { LogOut, RefreshCcw, LayoutDashboard, Database, BarChart2, Users, ShoppingBag, Activity, FileText, Clock } from 'lucide-react'
 
 export default function DashboardPage() {
     const [dateFrom, setDateFrom] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'))
@@ -32,7 +33,12 @@ export default function DashboardPage() {
     const [masters, setMasters] = useState<Masters | undefined>(undefined)
     const [isLoading, setIsLoading] = useState(false)
     const [isForcingRefresh, setIsForcingRefresh] = useState(false)
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'analitica' | 'comparativa' | 'users' | 'purchases'>('dashboard')
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'analitica' | 'active_session' | 'comparativa' | 'users' | 'purchases'>('dashboard')
+
+    // Active Sessions state
+    const [activeSessions, setActiveSessions] = useState<ActiveSession[] | null>(null)
+    const [isActiveSessionLoading, setIsActiveSessionLoading] = useState(false)
+
     const router = useRouter()
 
     const odooStates = [
@@ -51,8 +57,29 @@ export default function DashboardPage() {
         }
 
         loadMasters()
-        fetchReport()
+        if (activeTab === 'active_session') {
+            fetchActiveSessions()
+        } else {
+            fetchReport()
+        }
     }, [activeTab]) // Re-fetch or apply rules on tab change
+
+    const fetchActiveSessions = async () => {
+        setIsActiveSessionLoading(true)
+        try {
+            const { data } = await dashboardAPI.getActiveSessions()
+            if (data.status === 'success') {
+                setActiveSessions(data.sessions || [])
+            } else {
+                setActiveSessions([])
+            }
+        } catch (error) {
+            console.error('Error fetching active sessions', error)
+            setActiveSessions([])
+        } finally {
+            setIsActiveSessionLoading(false)
+        }
+    }
 
     const loadMasters = async () => {
         try {
@@ -62,6 +89,7 @@ export default function DashboardPage() {
             console.error('Error loading masters', error)
         }
     }
+
 
     const fetchReport = async (force = false) => {
         setIsLoading(true)
@@ -175,6 +203,13 @@ export default function DashboardPage() {
                     Analitica
                 </button>
                 <button
+                    onClick={() => setActiveTab('active_session')}
+                    className={`px-4 py-2 text-sm font-bold tracking-widest uppercase transition-colors rounded-t-md flex items-center gap-2 whitespace-nowrap ${activeTab === 'active_session' ? 'bg-primary/10 text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'}`}
+                >
+                    <Clock className="h-4 w-4" />
+                    Sesión Activa
+                </button>
+                <button
                     onClick={() => setActiveTab('comparativa')}
                     className={`px-4 py-2 text-sm font-bold tracking-widest uppercase transition-colors rounded-t-md flex items-center gap-2 whitespace-nowrap ${activeTab === 'comparativa' ? 'bg-primary/10 text-primary border-b-2 border-primary' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'}`}
                 >
@@ -198,31 +233,39 @@ export default function DashboardPage() {
             </div>
 
             {/* Filters */}
-            <FiltersSection
-                activeTab={activeTab}
-                dateFrom={dateFrom}
-                dateTo={dateTo}
-                compareDateFrom={compareDateFrom}
-                compareDateTo={compareDateTo}
-                selectedUsers={selectedUsers}
-                selectedPayments={selectedPayments}
-                selectedProductGroups={selectedProductGroups}
-                selectedStates={selectedStates}
-                masters={masters}
-                odooStates={odooStates}
-                onDateFromChange={setDateFrom}
-                onDateToChange={setDateTo}
-                onCompareDateFromChange={setCompareDateFrom}
-                onCompareDateToChange={setCompareDateTo}
-                onUsersChange={setSelectedUsers}
-                onPaymentsChange={setSelectedPayments}
-                onProductGroupsChange={setSelectedProductGroups}
-                onStatesChange={setSelectedStates}
-                onFetchReport={fetchReport}
-                isLoading={isLoading}
-            />
+            {activeTab !== 'active_session' && (
+                <FiltersSection
+                    activeTab={activeTab}
+                    dateFrom={dateFrom}
+                    dateTo={dateTo}
+                    compareDateFrom={compareDateFrom}
+                    compareDateTo={compareDateTo}
+                    selectedUsers={selectedUsers}
+                    selectedPayments={selectedPayments}
+                    selectedProductGroups={selectedProductGroups}
+                    selectedStates={selectedStates}
+                    masters={masters}
+                    odooStates={odooStates}
+                    onDateFromChange={setDateFrom}
+                    onDateToChange={setDateTo}
+                    onCompareDateFromChange={setCompareDateFrom}
+                    onCompareDateToChange={setCompareDateTo}
+                    onUsersChange={setSelectedUsers}
+                    onPaymentsChange={setSelectedPayments}
+                    onProductGroupsChange={setSelectedProductGroups}
+                    onStatesChange={setSelectedStates}
+                    onFetchReport={fetchReport}
+                    isLoading={isLoading}
+                />
+            )}
 
-            {reportData && (activeTab !== 'comparativa' || compareReportData) ? (
+            {activeTab === 'active_session' ? (
+                <ActiveSessionView 
+                    sessions={activeSessions} 
+                    isLoading={isActiveSessionLoading} 
+                    onRefresh={fetchActiveSessions} 
+                />
+            ) : reportData && (activeTab !== 'comparativa' || compareReportData) ? (
                 <>
                     {/* DASHBOARD TAB CONTENT */}
                     {activeTab === 'dashboard' && (

@@ -1,11 +1,11 @@
 'use client'
 
 import { OdooTooltip } from '@/components/ui/odoo-tooltip'
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatCurrency } from '@/lib/utils'
 import type { ReportRow } from '@/lib/types'
-import { Table, ChevronDown, ChevronRight, Hash } from 'lucide-react'
+import { Table, ChevronDown, ChevronRight, ChevronUp, Hash } from 'lucide-react'
 
 interface DataTableProps {
     data: ReportRow[]
@@ -14,6 +14,17 @@ interface DataTableProps {
 export function DataTable({ data }: DataTableProps) {
     const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({})
     const [expandedSessions, setExpandedSessions] = useState<Record<number, boolean>>({})
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+
+    const sortedData = useMemo(() => {
+        return [...data].sort((a, b) => {
+            if (sortOrder === 'asc') {
+                return a.fecha.localeCompare(b.fecha)
+            } else {
+                return b.fecha.localeCompare(a.fecha)
+            }
+        })
+    }, [data, sortOrder])
 
     if (data.length === 0) {
         return (
@@ -46,7 +57,15 @@ export function DataTable({ data }: DataTableProps) {
                     <table className="w-full">
                         <thead>
                             <tr className="border-b border-border">
-                                <th className="px-4 py-3 text-left text-sm font-semibold w-32">Fecha</th>
+                                <th 
+                                    onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                                    className="px-4 py-3 text-left text-sm font-semibold w-32 cursor-pointer hover:text-primary transition-colors select-none"
+                                >
+                                    <span className="flex items-center gap-1">
+                                        Fecha
+                                        {sortOrder === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                                    </span>
+                                </th>
                                 <th className="px-4 py-3 text-right text-sm font-semibold">Cuentas</th>
                                 <th className="px-4 py-3 text-right text-sm font-semibold">Alimentos</th>
                                 <th className="px-4 py-3 text-right text-sm font-semibold">Bebidas</th>
@@ -57,8 +76,9 @@ export function DataTable({ data }: DataTableProps) {
                             </tr>
                         </thead>
                         <tbody>
-                            {data.map((row, idx) => (
+                            {sortedData.map((row, idx) => (
                                 <React.Fragment key={idx}>
+
                                     <tr 
                                         onClick={() => toggleRow(row.fecha)}
                                         className="border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer"

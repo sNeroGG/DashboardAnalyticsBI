@@ -72,3 +72,25 @@ export interface ReportPayload {
     states?: string[]
     force_refresh?: boolean
 }
+
+export interface ActiveSession {
+    id: number
+    name: string
+    cashier: string
+    start_at: string
+    total_cuentas: number
+    total_pagado: number
+    alimentos: number
+    bebidas: number
+    propina: number
+    otros: number
+    restaurante_efectivo: number
+    tarjeta: number
+    cuentas: ReportCuenta[]
+}
+
+export interface ActiveSessionsResponse {
+    status: string
+    sessions: ActiveSession[]
+}
+

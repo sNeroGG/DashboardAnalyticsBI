@@ -336,3 +336,245 @@ def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=
         "usuarios": usuarios_list,
         "metodos": [{"metodo": k, "monto": v} for k, v in summary_metodos.items()]
     }
+
+def generate_active_sessions_report(odoo):
+    # 1. CARGA DE MAESTROS - LOCALIZACIÓN ULTRA-ROBUSTA
+    masters = {}
+    master_locations = ["cache/masters.json", "/app/cache/masters.json", "backend/cache/masters.json"]
+    for loc in master_locations:
+        if os.path.exists(loc):
+            with open(loc, "r", encoding="utf-8") as f:
+                masters = json.load(f)
+            break
+            
+    # Mapeo de IDs (tus IDs reales sacados de masters.json)
+    user_map = {str(u["id"]): u["name"] for u in masters.get("res.users", [])}
+    payment_map = {str(p["id"]): p["name"] for p in masters.get("pos.payment.method", [])}
+
+    # Detección dinámica de campos en pos.order
+    base_fields = ["id", "name", "date_order", "amount_total", "state", "user_id", "tip_amount", "session_id", "customer_count"]
+    order_creator_fields = []
+    try:
+        odoo.search("pos.order", [("id", "=", 0)], ["order_creator_id", "order_creator_name"])
+        order_creator_fields = ["order_creator_id", "order_creator_name"]
+    except Exception:
+        try:
+            odoo.search("pos.order", [("id", "=", 0)], ["order_creator_id"])
+            order_creator_fields = ["order_creator_id"]
+        except Exception:
+            try:
+                odoo.search("pos.order", [("id", "=", 0)], ["order_creator_name"])
+                order_creator_fields = ["order_creator_name"]
+            except Exception:
+                pass
+    order_fields = base_fields + order_creator_fields
+
+    # Detección dinámica de product_group en pos.category
+    has_product_group = False
+    try:
+        odoo.search("pos.category", [("id", "=", 0)], ["product_group"])
+        has_product_group = True
+    except Exception:
+        pass
+
+    # Detección dinámica del campo de categoría de producto (pos_categ_ids en Odoo 17+ o pos_categ_id en anteriores)
+    product_category_field = "pos_categ_id"
+    try:
+        odoo.search("product.product", [("id", "=", 0)], ["pos_categ_ids"])
+        product_category_field = "pos_categ_ids"
+    except Exception:
+        pass
+
+    # Carga de categorías de punto de venta (pos.category)
+    categories = []
+    try:
+        if has_product_group:
+            categories = odoo.search("pos.category", [], ["id", "name", "product_group"])
+        else:
+            categories = odoo.search("pos.category", [], ["id", "name"])
+    except Exception as e:
+        print(f"Error querying pos.category: {e}")
+
+    category_groups = {}
+    for c in categories:
+        group = c.get("product_group") if has_product_group else None
+        if isinstance(group, list) and len(group) > 1:
+            group = group[1]
+        category_groups[c["id"]] = group or c.get("name") or "Otros"
+
+    # Buscar sesiones abiertas
+    sessions = odoo.search("pos.session", [("state", "=", "opened")], ["id", "name", "start_at", "user_id"])
+    if not sessions:
+        return {"status": "success", "sessions": []}
+
+    session_ids = [s["id"] for s in sessions]
+    
+    # Buscar órdenes de estas sesiones
+    orders = odoo.search("pos.order", [("session_id", "in", session_ids), ("state", "!=", "cancel")], order_fields)
+    
+    order_ids = [o["id"] for o in orders]
+    
+    payments_records = []
+    lines_records = []
+    product_to_category = {}
+    if order_ids:
+        payments_records = odoo.search("pos.payment", [("pos_order_id", "in", order_ids)], ["pos_order_id", "amount", "payment_method_id"])
+        
+        try:
+            lines_records = odoo.search("pos.order.line", [("order_id", "in", order_ids)], ["order_id", "product_id", "price_subtotal_incl"])
+            product_ids = list(set(get_id(line.get("product_id")) for line in lines_records if line.get("product_id")))
+            if product_ids:
+                rpc_user = os.environ.get("ODOO_RPC_USER")
+                rpc_key = os.environ.get("ODOO_RPC_KEY")
+                
+                queried_via_rpc = False
+                if rpc_user and rpc_key:
+                    try:
+                        import xmlrpc.client
+                        base_url = odoo.url
+                        if base_url.endswith("/api"):
+                            base_url = base_url[:-4]
+                        
+                        common = xmlrpc.client.ServerProxy(f"{base_url}/xmlrpc/2/common")
+                        uid = common.authenticate(odoo.db, rpc_user, rpc_key, {})
+                        if uid:
+                            models = xmlrpc.client.ServerProxy(f"{base_url}/xmlrpc/2/object")
+                            products_data = models.execute_kw(
+                                odoo.db, uid, rpc_key, 
+                                "product.product", "search_read", 
+                                [[("id", "in", product_ids)]], 
+                                {"fields": ["id", "pos_categ_ids"]}
+                            )
+                            for p in products_data:
+                                product_to_category[p["id"]] = get_id(p.get("pos_categ_ids"))
+                            queried_via_rpc = True
+                    except Exception as rpc_err:
+                        print(f"Error querying categories via XML-RPC in active sessions: {rpc_err}")
+                
+                if not queried_via_rpc:
+                    products = odoo.search("product.product", [("id", "in", product_ids)], ["id", product_category_field])
+                    for p in products:
+                        product_to_category[p["id"]] = get_id(p.get(product_category_field))
+        except Exception as e:
+            print(f"Error loading lines/product categories in active sessions: {e}")
+
+    # Agrupar propinas (producto 399) y pagos
+    order_tips = {}
+    for l in lines_records:
+        pid = get_id(l.get("product_id"))
+        if pid == 399:
+            oid = get_id(l.get("order_id"))
+            order_tips[oid] = order_tips.get(oid, 0.0) + l.get("price_subtotal_incl", 0.0)
+            
+    order_payments = {}
+    for p in payments_records:
+        oid = get_id(p.get("pos_order_id"))
+        order_payments[oid] = order_payments.get(oid, 0.0) + p.get("amount", 0.0)
+
+    # Agrupar líneas por orden
+    order_lines_map = {}
+    for l in lines_records:
+        oid = get_id(l.get("order_id"))
+        if oid not in order_lines_map:
+            order_lines_map[oid] = []
+        order_lines_map[oid].append(l)
+
+    # Inicializar reporte de cada sesión activa
+    session_reports = {}
+    for s in sessions:
+        s_id = s["id"]
+        s_user = s.get("user_id")
+        cashier_name = s_user[1] if isinstance(s_user, list) and len(s_user) > 1 else (user_map.get(str(get_id(s_user))) or "Cajero Desconocido")
+        
+        session_reports[s_id] = {
+            "id": s_id,
+            "name": f'SESION "{s["name"]}"',
+            "cashier": cashier_name,
+            "start_at": s.get("start_at"),
+            "total_cuentas": 0,
+            "total_pagado": 0.0,
+            "alimentos": 0.0,
+            "bebidas": 0.0,
+            "propina": 0.0,
+            "otros": 0.0,
+            "restaurante_efectivo": 0.0,
+            "tarjeta": 0.0,
+            "cuentas": []
+        }
+
+    # Procesar órdenes
+    for o in orders:
+        o_id = o["id"]
+        s_val = o.get("session_id")
+        s_id = get_id(s_val) or 0
+        
+        if s_id not in session_reports:
+            continue
+            
+        o_lines = order_lines_map.get(o_id, [])
+        o_total = order_payments.get(o_id, o.get("amount_total", 0.0))
+        o_tip = order_tips.get(o_id, o.get("tip_amount", 0.0))
+        if o_total < o_tip:
+            o_tip = o_total
+            
+        o_alimentos = 0.0
+        o_bebidas = 0.0
+        o_otros = 0.0
+        
+        for l in o_lines:
+            pid = get_id(l.get("product_id"))
+            if pid == 399:
+                continue
+            amount = l.get("price_subtotal_incl", 0.0)
+            cat_id = product_to_category.get(pid)
+            group = category_groups.get(cat_id, "Otros") if cat_id else "Otros"
+            group_lower = str(group).lower()
+            
+            if group_lower == "food" or "alimento" in group_lower or "comida" in group_lower:
+                o_alimentos += amount
+            elif group_lower == "drink" or "bebida" in group_lower or "trago" in group_lower:
+                o_bebidas += amount
+            else:
+                o_otros += amount
+                
+        if not o_lines:
+            o_alimentos = (o_total - o_tip) * 0.7
+            o_bebidas = (o_total - o_tip) * 0.3
+            o_otros = 0.0
+
+        o_personas = o.get("customer_count") or 1
+        
+        session_reports[s_id]["total_cuentas"] += 1
+        session_reports[s_id]["total_pagado"] += o_total
+        session_reports[s_id]["propina"] += o_tip
+        session_reports[s_id]["alimentos"] += o_alimentos
+        session_reports[s_id]["bebidas"] += o_bebidas
+        session_reports[s_id]["otros"] += o_otros
+        
+        o_pays = [p for p in payments_records if get_id(p.get("pos_order_id")) == o_id]
+        if not o_pays:
+            session_reports[s_id]["restaurante_efectivo"] += o_total
+        else:
+            for pr in o_pays:
+                pm_id = str(get_id(pr.get("payment_method_id")))
+                pm_amount = pr.get("amount", 0.0)
+                if pm_id == "2":
+                    session_reports[s_id]["tarjeta"] += pm_amount
+                else:
+                    session_reports[s_id]["restaurante_efectivo"] += pm_amount
+                    
+        session_reports[s_id]["cuentas"].append({
+            "id": o_id,
+            "nombre": o["name"],
+            "propina": o_tip,
+            "total": o_total,
+            "personas": o_personas,
+            "ticket_promedio_persona": o_total / o_personas if o_personas > 0 else o_total,
+            "estado": o.get("state")
+        })
+
+    return {
+        "status": "success",
+        "sessions": list(session_reports.values())
+    }
+

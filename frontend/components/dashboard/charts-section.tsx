@@ -71,38 +71,47 @@ export function ChartsSection({ data }: ChartsSectionProps) {
             {/* 2 PEQUEÑAS DEBAJO */}
             <div className="grid gap-4 md:grid-cols-2">
                 <Card>
-                    <CardHeader>
-                    <OdooTooltip model="pos.category" field="product_group" filter="Venta real agrupada por el campo 'product_group' en las categorías del punto de venta en Odoo." className="w-fit">
-                        <CardTitle className="flex items-center gap-2 cursor-help">
-                            <PieChartIcon className="h-5 w-5" />
-                            Distribución de Consumo
-                        </CardTitle>
-                    </OdooTooltip>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <OdooTooltip model="pos.category" field="product_group" filter="Venta real agrupada por el campo 'product_group' en las categorías del punto de venta en Odoo." className="w-fit">
+                            <CardTitle className="flex items-center gap-2 cursor-help text-base font-semibold">
+                                <PieChartIcon className="h-5 w-5" />
+                                Distribución de Consumo
+                            </CardTitle>
+                        </OdooTooltip>
+                        <div className="text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-1 rounded-md">
+                            Total: {formatCurrency(pieData.reduce((sum, item) => sum + item.value, 0))}
+                        </div>
                     </CardHeader>
                     <CardContent>
                         <ResponsiveContainer width="100%" height={280}>
-                            <PieChart>
-                                <Pie
-                                    data={pieData}
-                                    cx="50%"
-                                    cy="50%"
-                                    innerRadius={50}
-                                    outerRadius={90}
-                                    paddingAngle={5}
-                                    dataKey="value"
-                                    label={(entry) => formatCurrency(entry.value)}
+                            <BarChart
+                                layout="vertical"
+                                data={pieData}
+                                margin={{ top: 20, right: 60, left: 10, bottom: 5 }}
+                            >
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                                <XAxis type="number" stroke="#fff" fontSize={9} tickFormatter={(val) => formatCurrency(val)} />
+                                <YAxis dataKey="name" type="category" stroke="#fff" fontSize={10} width={70} />
+                                <Tooltip
+                                    formatter={(value: number) => [formatCurrency(value), 'Monto']}
+                                    contentStyle={{ backgroundColor: '#16213e', border: '1px solid #e94560', borderRadius: '8px' }}
+                                    itemStyle={{ color: '#fff' }}
+                                />
+                                <Bar 
+                                    dataKey="value" 
+                                    radius={[0, 4, 4, 0]} 
+                                    label={{ 
+                                        position: 'right', 
+                                        fill: '#fff', 
+                                        fontSize: 9, 
+                                        formatter: (val: number) => formatCurrency(val) 
+                                    }}
                                 >
                                     {pieData.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={entry.color} />
                                     ))}
-                                </Pie>
-                                <Tooltip
-                                    formatter={(value: number, name: string) => [formatCurrency(value), name]}
-                                    contentStyle={{ backgroundColor: '#16213e', border: '1px solid #e94560', borderRadius: '8px' }}
-                                    itemStyle={{ color: '#fff' }}
-                                />
-                                <Legend wrapperStyle={{ fontSize: '11px' }} />
-                            </PieChart>
+                                </Bar>
+                            </BarChart>
                         </ResponsiveContainer>
                     </CardContent>
                 </Card>

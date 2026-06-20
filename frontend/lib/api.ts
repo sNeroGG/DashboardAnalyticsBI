@@ -40,4 +40,6 @@ export const authAPI = {
 export const dashboardAPI = {
     getMasters: () => api.get('/bi/masters'),
     getReportVentas: (payload: any) => api.post('/bi/report/ventas', payload),
+    getActiveSessions: () => api.get('/bi/report/active-sessions'),
 }
+
