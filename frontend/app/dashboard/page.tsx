@@ -13,6 +13,7 @@ import { UserTable } from '@/components/dashboard/user-table'
 import { AdvancedAnalytics } from '@/components/dashboard/advanced-analytics'
 import { MonthComparison } from '@/components/dashboard/month-comparison'
 import { PrintSummary } from '@/components/dashboard/print-summary'
+import { PrintActiveSessionsSummary } from '@/components/dashboard/print-active-sessions-summary'
 import { ActiveSessionView } from '@/components/dashboard/active-session-view'
 import { dashboardAPI } from '@/lib/api'
 import type { ReportData, Masters, ActiveSession } from '@/lib/types'
@@ -37,6 +38,7 @@ export default function DashboardPage() {
 
     // Active Sessions state
     const [activeSessions, setActiveSessions] = useState<ActiveSession[] | null>(null)
+    const [isActiveSession, setIsActiveSession] = useState(true)
     const [isActiveSessionLoading, setIsActiveSessionLoading] = useState(false)
 
     const router = useRouter()
@@ -70,12 +72,15 @@ export default function DashboardPage() {
             const { data } = await dashboardAPI.getActiveSessions()
             if (data.status === 'success') {
                 setActiveSessions(data.sessions || [])
+                setIsActiveSession(data.is_active ?? true)
             } else {
                 setActiveSessions([])
+                setIsActiveSession(true)
             }
         } catch (error) {
             console.error('Error fetching active sessions', error)
             setActiveSessions([])
+            setIsActiveSession(true)
         } finally {
             setIsActiveSessionLoading(false)
         }
@@ -148,6 +153,21 @@ export default function DashboardPage() {
         setTimeout(() => {
             window.print()
             // Restore original title after print dialog has loaded
+            setTimeout(() => {
+                document.title = originalTitle
+            }, 500)
+        }, 150)
+    }
+
+    const handleActiveSessionPrint = () => {
+        const originalTitle = document.title
+        const dateStr = format(new Date(), 'yyyy-MM-dd')
+        document.title = isActiveSession 
+            ? `Sesiones Activas - Herra - ${dateStr}`
+            : `Ultimas Sesiones Activas - Herra - ${dateStr}`
+        
+        setTimeout(() => {
+            window.print()
             setTimeout(() => {
                 document.title = originalTitle
             }, 500)
@@ -262,8 +282,10 @@ export default function DashboardPage() {
             {activeTab === 'active_session' ? (
                 <ActiveSessionView 
                     sessions={activeSessions} 
+                    isActive={isActiveSession}
                     isLoading={isActiveSessionLoading} 
                     onRefresh={fetchActiveSessions} 
+                    onPrint={handleActiveSessionPrint}
                 />
             ) : reportData && (activeTab !== 'comparativa' || compareReportData) ? (
                 <>
@@ -327,11 +349,15 @@ export default function DashboardPage() {
                 </div>
             )}
             </div>
-            {reportData && (
+            {activeTab === 'active_session' && activeSessions ? (
+                <div className="hidden print:block bg-white text-black p-4 w-full h-full text-[10px] font-sans">
+                    <PrintActiveSessionsSummary sessions={activeSessions} isActive={isActiveSession} />
+                </div>
+            ) : reportData ? (
                 <div className="hidden print:block bg-white text-black p-4 w-full h-full text-[10px] font-sans">
                     <PrintSummary reportData={reportData} dateFrom={dateFrom} dateTo={dateTo} />
                 </div>
-            )}
+            ) : null}
         </>
     )
 }

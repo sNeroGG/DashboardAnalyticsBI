@@ -14,22 +14,63 @@ export function PaymentMethods({ reportData, masters, selectedPayments }: Paymen
     const metodosMaestros = masters?.['pos.payment.method'] || []
 
     // Cruzar métodos retornados con los maestros para asegurar los $0
-    const metodosCalculados = metodosMaestros.map(m => {
-        // Encontrar lo que devolvió el backend para este método
-        const backP = reportData.metodos?.find((row: any) => row.metodo === m.name)
-        // Si el usuario aplicó filtros y el método NO ESTÁ en el filtro, forzamos a 0
-        let monto = backP ? backP.monto : 0
+    let metodosCalculados = []
+    if (metodosMaestros.length > 0) {
+        metodosCalculados = metodosMaestros.map(m => {
+            // Encontrar lo que devolvió el backend para este método
+            const backP = reportData.metodos?.find((row: any) => {
+                if (!row.metodo) return false;
+                const rowMetodoLower = String(row.metodo).toLowerCase();
+                const mNameLower = String(m.name).toLowerCase();
+                return (
+                    rowMetodoLower === mNameLower ||
+                    rowMetodoLower.includes(mNameLower) ||
+                    mNameLower.includes(rowMetodoLower) ||
+                    row.metodo === `Metodo ${m.id}` ||
+                    row.metodo === String(m.id)
+                );
+            })
+            // Si el usuario aplicó filtros y el método NO ESTÁ en el filtro, forzamos a 0
+            let monto = backP ? backP.monto : 0
 
-        // Regla estricta: Si hay selección en el filtro y ESTE método no fue seleccionado, forzamos a 0
-        if (selectedPayments.length > 0 && !selectedPayments.includes(m.id)) {
-            monto = 0
-        }
+            // Regla estricta: Si hay selección en el filtro y ESTE método no fue seleccionado, forzamos a 0
+            if (selectedPayments.length > 0 && !selectedPayments.includes(m.id)) {
+                monto = 0
+            }
 
-        return {
-            metodo: m.name,
-            monto: monto
-        }
-    }).sort((a, b) => b.monto - a.monto)
+            return {
+                metodo: m.name,
+                monto: monto
+            }
+        })
+    } else {
+        // Robust Fallback: Usar los métodos devueltos por el backend si no hay maestros cargados
+        metodosCalculados = (reportData.metodos || []).map((row: any) => {
+            let displayMetodo = row.metodo
+            let matchedId: number | null = null
+            
+            if (row.metodo && row.metodo.startsWith('Metodo ')) {
+                const idStr = row.metodo.substring(7)
+                matchedId = parseInt(idStr, 10)
+                const matchedMaster = masters?.['pos.payment.method']?.find(m => String(m.id) === idStr)
+                if (matchedMaster) {
+                    displayMetodo = matchedMaster.name
+                }
+            }
+            
+            if (selectedPayments.length > 0 && matchedId !== null && !selectedPayments.includes(matchedId)) {
+                return null
+            }
+            
+            return {
+                metodo: displayMetodo,
+                monto: row.monto
+            }
+        }).filter(Boolean) as any[]
+    }
+    
+    metodosCalculados.sort((a, b) => b.monto - a.monto)
+
 
     return (
         <Card>

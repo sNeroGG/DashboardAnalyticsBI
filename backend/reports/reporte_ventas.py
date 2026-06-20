@@ -404,8 +404,19 @@ def generate_active_sessions_report(odoo):
 
     # Buscar sesiones abiertas
     sessions = odoo.search("pos.session", [("state", "=", "opened")], ["id", "name", "start_at", "user_id"])
+    
+    is_active = True
     if not sessions:
-        return {"status": "success", "sessions": []}
+        is_active = False
+        # Buscar las últimas sesiones cerradas en los últimos 30 días para mostrar como histórico reciente
+        from datetime import datetime, timedelta
+        date_limit = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
+        sessions = odoo.search("pos.session", [("state", "=", "closed"), ("start_at", ">=", date_limit)], ["id", "name", "start_at", "user_id"])
+        # Ordenar por fecha de apertura descendente y tomar las últimas 2
+        sessions = sorted(sessions, key=lambda x: x.get("start_at", ""), reverse=True)[:2]
+
+    if not sessions:
+        return {"status": "success", "sessions": [], "is_active": False}
 
     # Cargar nombres de usuarios en tiempo real para evitar "Cajero Desconocido"
     user_ids = []
@@ -630,6 +641,7 @@ def generate_active_sessions_report(odoo):
 
     return {
         "status": "success",
-        "sessions": list(session_reports.values())
+        "sessions": list(session_reports.values()),
+        "is_active": is_active
     }
 
