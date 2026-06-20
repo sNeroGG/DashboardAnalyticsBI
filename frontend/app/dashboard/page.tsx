@@ -297,6 +297,7 @@ export default function DashboardPage() {
                         onStatesChange={setSelectedStates}
                         onFetchReport={fetchReport}
                         isLoading={isLoading}
+                        reportData={reportData || undefined}
                     />
                 )}
 

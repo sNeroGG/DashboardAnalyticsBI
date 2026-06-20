@@ -4,7 +4,7 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Search, Loader2, Calendar, Users, CreditCard, Layers, ChevronDown, Filter, Target, Info } from 'lucide-react'
-import type { Masters } from '@/lib/types'
+import type { Masters, ReportData } from '@/lib/types'
 import { format, addDays } from 'date-fns'
 
 interface FiltersSectionProps {
@@ -29,6 +29,7 @@ interface FiltersSectionProps {
     onStatesChange: (states: string[]) => void
     onFetchReport: () => void
     isLoading: boolean
+    reportData?: ReportData
 }
 
 export function FiltersSection({
@@ -53,6 +54,7 @@ export function FiltersSection({
     onStatesChange,
     onFetchReport,
     isLoading,
+    reportData,
 }: FiltersSectionProps) {
     const [openDropdown, setOpenDropdown] = useState<string | null>(null)
     const [queryMode, setQueryMode] = useState<'day' | 'month' | 'quarter' | 'year'>('month')
@@ -160,6 +162,31 @@ export function FiltersSection({
             .filter(Boolean) as string[]
         return Array.from(new Set(groups)).sort()
     }, [masters])
+
+    // Fallback lists if masters is empty
+    const usersList = useMemo(() => {
+        if (masters?.['res.users'] && masters['res.users'].length > 0) {
+            return masters['res.users']
+        }
+        if (reportData?.usuarios) {
+            return reportData.usuarios
+                .map(u => ({ id: u.id || 0, name: u.nombre }))
+                .filter(u => u.id !== 0)
+        }
+        return []
+    }, [masters, reportData])
+
+    const paymentsList = useMemo(() => {
+        if (masters?.['pos.payment.method'] && masters['pos.payment.method'].length > 0) {
+            return masters['pos.payment.method']
+        }
+        if (reportData?.metodos) {
+            return reportData.metodos
+                .map(pm => ({ id: pm.id || 0, name: pm.metodo }))
+                .filter(pm => pm.id !== 0)
+        }
+        return []
+    }, [masters, reportData])
 
     const evaluationText = useMemo(() => {
         if (activeTab === 'comparativa') {
@@ -348,7 +375,7 @@ export function FiltersSection({
                                     </div>
                                     {openDropdown === 'users' && (
                                         <div className="absolute z-50 mt-1 max-h-48 w-60 overflow-auto rounded border bg-popover p-1 shadow-2xl">
-                                            {masters?.['res.users']?.map(user => (
+                                            {usersList.map(user => (
                                                 <label key={user.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 hover:bg-accent text-[10px]">
                                                     <input type="checkbox" checked={selectedUsers.includes(user.id)} onChange={() => onUsersChange(selectedUsers.includes(user.id) ? selectedUsers.filter(id => id !== user.id) : [...selectedUsers, user.id])} className="h-3 w-3" />
                                                     <span className="truncate">{user.name}</span>
@@ -366,7 +393,7 @@ export function FiltersSection({
                                     </div>
                                     {openDropdown === 'payments' && (
                                         <div className="absolute z-50 mt-1 max-h-48 w-56 overflow-auto rounded border bg-popover p-1 shadow-2xl">
-                                            {masters?.['pos.payment.method']?.map(pm => (
+                                            {paymentsList.map(pm => (
                                                 <label key={pm.id} className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 hover:bg-accent text-[10px]">
                                                     <input type="checkbox" checked={selectedPayments.includes(pm.id)} onChange={() => onPaymentsChange(selectedPayments.includes(pm.id) ? selectedPayments.filter(id => id !== pm.id) : [...selectedPayments, pm.id])} className="h-3 w-3" />
                                                     <span className="truncate">{pm.name}</span>

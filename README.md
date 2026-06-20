@@ -1,105 +1,81 @@
-# Dashboard Leads/$$ Odoo
+# Dashboard Analytics & BI - Odoo
 
-Este proyecto es un robusto ecosistema de Inteligencia de Negocios (BI) diseñado para extraer, procesar y visualizar métricas críticas de ventas desde Odoo ERP en tiempo real. Está optimizado para ser implementado como una solución "marca blanca" en diversos clientes, facilitando el control operativo de restaurantes y puntos de venta (POS).
+Este proyecto es un ecosistema de Inteligencia de Negocios (BI) diseñado para extraer, procesar y visualizar métricas críticas de ventas desde Odoo ERP en tiempo real. Está optimizado para ser implementado como una solución adaptada a restaurantes y puntos de venta (POS).
 
-## 🚀 Innovaciones y Funcionalidades Principales
+---
 
-### 1. Navegación Inteligente y Pestañas de Análisis
-El dashboard cuenta con un sistema de navegación dual que separa la operación diaria del análisis estratégico:
-- **Dashboard General**: Una vista limpia y minimalista filtrada por fechas para observar el rendimiento global del negocio.
-- **Análisis Avanzado**: Un entorno de filtros matemáticos profundos donde los usuarios pueden segmentar por **Cajeros/Vendedores**, **Métodos de Pago** y **Estado de Venta**.
+## 🚀 Funcionalidades Principales
 
-### 2. Filtros Matemáticos Reales (Backend Driven)
-A diferencia de otros dashboards, los filtros aquí no son solo visuales. El backend en Python procesa cada selección para recalcular:
-- **Filtrado de Usuarios**: Exclusión total de montos y transacciones de usuarios no seleccionados en el `domain` de búsqueda.
-- **Filtrado de Pagos**: Desglose exacto de pagos mixtos (Efectivo vs. Tarjeta) en el cálculo de totales cuando se aplican filtros.
+1. **Dashboard General**: Métricas de ventas, transacciones, desgloses por categoría (alimentos/bebidas), propinas y métodos de pago de un periodo filtrable.
+2. **Sesión Activa**: Vista detallada en tiempo real de las sesiones abiertas en Odoo. Permite filtrar sesiones de prueba, ver resúmenes financieros por estado y descargar PDFs formateados para impresión de las sesiones seleccionadas.
+3. **Ventas por Vendedor**: Gráficas y tablas de rendimiento por usuario.
+4. **Analítica Avanzada & Comparativa**: Análisis acumulados y comparación de periodos (mes contra mes).
 
-### 3. Jerarquía de Datos: Jornadas y Sesiones
-El reporte agrupa la información siguiendo la lógica de negocio real:
-- **Jornada Laboral**: Agrupación administrativa por día contable para cuadrar con el cierre operativo. *(Nota: Por defecto está calibrado para considerar turnos con desfase horario, ajustable en el backend).*
-- **Sesiones de Odoo**: Identificación de cada apertura y cierre de caja (`pos.session`) dentro de un día.
-- **Desglose de Cuentas**: Acceso granular a cada ticket individual (`pos.order`), su estado (Pagado/Facturado) y otros detalles específicos del servicio.
+---
 
-## 📂 Estructura del Proyecto e Implementación
+## 📁 Estructura del Proyecto
 
-El proyecto se divide en dos bloques principales (Frontend y Backend) orquestados mediante Docker.
+- `backend/`: API REST en Python (Flask) con lógica de conexión a Odoo.
+- `frontend/`: Interfaz gráfica moderna en Next.js con Tailwind CSS y componentes de Shadcn UI.
+- `docker-compose.yml`: Orquestador principal de servicios.
+- `DEPLOY.md`: Guía de despliegue y actualización en servidores de producción.
 
-```text
-dashboard/
-├── docker-compose.yml       # Orquestador principal de servicios
-├── DEPLOY.md                # Instrucciones de despliegue en producción
-├── README.md                # Este archivo
-├── backend/                 # API REST (Python / Flask)
-│   ├── bi_service.py        # Archivo principal del servidor Flask y rutas
-│   ├── config.py            # Manejo de variables de entorno y configuración
-│   ├── masters_loader.py    # Script de carga inicial de catálogos desde Odoo
-│   ├── tests/               # Scripts de validación y depuración (No afecta prod)
-│   ├── core/                # Funciones base (conexión a Odoo, utilidades, seguridad)
-│   └── reports/             # Lógica de extracción de datos
-│       ├── reporte_ventas.py         # 🧠 Cerebro del sistema: Lógica de extracción Odoo
-│       └── advanced_analytics.py     # Lógica matemática de los filtros avanzados
-└── frontend/                # Interfaz Gráfica (Next.js / Tailwind CSS)
-    ├── package.json
-    ├── next.config.js       # Configuración del servidor React
-    ├── app/                 # Sistema de enrutamiento (Pages)
-    │   ├── dashboard/       # Vista principal del Dashboard
-    │   └── login/           # Pantalla de Autenticación
-    ├── components/          # Componentes Visuales Reutilizables
-    │   ├── ui/              # Componentes base (Botones, inputs, tarjetas)
-    │   └── dashboard/       # Componentes lógicos del dashboard
-    │       ├── data-table.tsx       # Tabla principal de datos
-    │       ├── filters-section.tsx  # 🎛️ Controles: Filtros de fecha, usuarios y pagos
-    │       ├── stats-cards.tsx      # Tarjetas de resumen métrico superior
-    │       └── advanced-analytics.tsx # Pestaña de análisis en profundidad
-    └── lib/                 # Utilidades del frontend
-        ├── api.ts           # Cliente Axios para conectar con el Backend
-        └── types.ts         # Tipado estricto de TypeScript
-```
+---
 
-### ⚙️ ¿Dónde modificar parámetros clave para nuevos clientes?
+## 🛠️ Ejecución con Docker (Flujo Recomendado)
 
-- **Configuración de Variables de Odoo**: En el archivo `backend/.env` (Crea uno a partir de `backend/.env.example`).
-- **Lógica de Filtros y Casillas de Verificación**: 
-  - *Frontend:* `frontend/components/dashboard/filters-section.tsx` (Aquí se renderizan los checkboxes y selectores de fecha).
-  - *Backend:* `backend/reports/reporte_ventas.py` (Aquí se aplican las reglas de negocio sobre lo que seleccionó el usuario).
-- **Ajuste de Horarios de Turnos**: En `backend/bi_service.py` (Ruta `/api/bi/report/ventas`), ajusta el `timedelta(hours=X)` según la zona horaria y horario de cierre del cliente.
-- **Tipos de Pago (Efectivo/Tarjeta)**: Para cambiar cómo se nombran o mapean, revisa `backend/reports/reporte_ventas.py` y `frontend/lib/types.ts`.
-- **Productos Especiales (ej. Propinas)**: La lógica de productos fijos (como un ID específico de propina) se procesa en el ciclo iterativo dentro de `backend/reports/reporte_ventas.py`.
+Toda la aplicación está contenedorizada con Docker, por lo que no es necesario instalar dependencias de Python o Node locales.
 
-## 🛠️ Ejecución del Proyecto para Nuevos Usuarios
-
-Esta plataforma está configurada para garantizar un ambiente seguro, limpio y libre de conflictos gracias a la adopción del estándar *Docker Compose v2*. Para instrucciones de producción (Servidores en Vivo y Proxies Caddy), lee obligatoriamente el archivo maestro **`DEPLOY.md`**.
-
-### 1. Requisitos Previos
-- Instalar **Docker** y el plugin moderno de **Docker Compose** (versión V2+).
-- Mapeo de puertos configurado por defecto: 
-  - Frontend (NextJS): `3001`
-  - Backend (Flask/Python): `5000`
-
-### 2. Variables de Entorno (.env)
-Antes de iniciar, configura las credenciales de la base de datos objetivo:
-1. Dirígete a la carpeta `/backend/` e identifica el archivo `.env.example`.
-2. Duplícalo y renómbralo a `.env`.
-3. Rellena las credenciales de Odoo (URL, Base de Datos, Usuario/API Key).
-*(Activa `DEV_MODE=True` en el `.env` si necesitas evitar el login de seguridad durante las pruebas locales).*
-
-### 3. Levantar el Entorno Inmediato
-Gracias a que hemos configurado archivos `.dockerignore` estrictos, todo es automático. No necesitas instalar dependencias de Node o de Python de forma nativa ni preocuparte por cachés bloqueados.
-
-Desde la raíz del proyecto:
-
+### 1. Preparar las Variables de Entorno
+Dirígete a la carpeta `backend/` y crea el archivo `.env` a partir de la plantilla:
 ```bash
-# Empacar y crear los contenedores desde cero
-docker compose build
-
-# Levantar silenciosa y eficientemente
-docker compose up -d
+cp backend/.env.example backend/.env
 ```
+Abre el archivo `backend/.env` y configúralo con las credenciales de Odoo:
+- `ODOO_URL`: URL del servidor Odoo (ej. `https://tu-dominio.com/api` o `http://tu-ip:8069`)
+- `ODOO_DB`: Nombre de la base de datos de Odoo.
+- `ODOO_API_KEY`: API Key de conexión.
+- `DEV_MODE`: Establécelo en `True` si estás en desarrollo local para bypass de inicio de sesión.
 
-Si necesitas deshacer, destruir o reiniciar el sistema entero:
+### 2. Iniciar la Aplicación (Local o Servidor)
+Desde la raíz del proyecto, ejecuta:
 ```bash
-docker compose down
+docker compose up -d --build
+```
+Este comando descargará/compilará las imágenes y levantará los servicios en segundo plano:
+- **Frontend**: Acceso en `http://localhost:3001`
+- **Backend (API)**: Acceso en `http://localhost:5000`
+
+Para ver los logs de los contenedores en tiempo real:
+```bash
+docker compose logs -f
 ```
 
 ---
-*Dashboard Leads Odoo: Transforma el caos de datos crudos de tu ERP en decisiones estratégicas inteligentes, eficientes y seguras, adaptable a cualquier negocio.*
+
+## 🔄 Flujo de Actualización (Git Pull)
+
+Cuando el código sufra actualizaciones o realices un `git pull` en tu servidor, actualiza de la siguiente forma para aplicar los cambios de manera limpia:
+
+1. **Obtener los últimos cambios:**
+   ```bash
+   git pull origin main
+   ```
+2. **Recompilar e iniciar servicios actualizados:**
+   ```bash
+   docker compose up -d --build
+   ```
+
+---
+
+## 📦 Sincronización Manual de Catálogos (Masters)
+
+Los catálogos (nombres de vendedores, métodos de pago, etc.) se descargan de Odoo y se guardan en caché. Esto ocurre automáticamente al arrancar la aplicación o al dar clic en **"Sincronizar"** en el panel web. Si deseas forzar la sincronización de manera manual desde la terminal, puedes correr:
+
+```bash
+docker compose exec backend python masters_loader.py
+```
+
+---
+
+*Para instrucciones avanzadas sobre producción, proxies inversos (Caddy/Nginx) y resolución de problemas, consulta el archivo [DEPLOY.md](file:///n:/Archivos/Proyectos%20DEV/DashboardAnalyticsBI/DEPLOY.md).*

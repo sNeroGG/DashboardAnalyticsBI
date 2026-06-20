@@ -46,11 +46,13 @@ export interface ReportRow {
 }
 
 export interface UserData {
+    id?: number
     nombre: string
     ventas: number
 }
 
 export interface POSPaymentMethodData {
+    id?: number
     metodo: string
     monto: number
 }

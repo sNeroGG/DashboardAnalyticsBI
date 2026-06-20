@@ -14,7 +14,7 @@ export function PaymentMethods({ reportData, masters, selectedPayments }: Paymen
     const metodosMaestros = masters?.['pos.payment.method'] || []
 
     // Cruzar métodos retornados con los maestros para asegurar los $0
-    let metodosCalculados = []
+    let metodosCalculados: { id: number | null; metodo: string; monto: number }[] = []
     if (metodosMaestros.length > 0) {
         metodosCalculados = metodosMaestros.map(m => {
             // Encontrar lo que devolvió el backend para este método
@@ -39,6 +39,7 @@ export function PaymentMethods({ reportData, masters, selectedPayments }: Paymen
             }
 
             return {
+                id: m.id,
                 metodo: m.name,
                 monto: monto
             }
@@ -49,13 +50,16 @@ export function PaymentMethods({ reportData, masters, selectedPayments }: Paymen
             let displayMetodo = row.metodo
             let matchedId: number | null = null
             
-            if (row.metodo && row.metodo.startsWith('Metodo ')) {
+            if (row.id !== undefined && row.id !== null) {
+                matchedId = Number(row.id)
+            } else if (row.metodo && row.metodo.startsWith('Metodo ')) {
                 const idStr = row.metodo.substring(7)
                 matchedId = parseInt(idStr, 10)
-                const matchedMaster = masters?.['pos.payment.method']?.find(m => String(m.id) === idStr)
-                if (matchedMaster) {
-                    displayMetodo = matchedMaster.name
-                }
+            }
+
+            const matchedMaster = masters?.['pos.payment.method']?.find(m => String(m.id) === String(matchedId))
+            if (matchedMaster) {
+                displayMetodo = matchedMaster.name
             }
             
             if (selectedPayments.length > 0 && matchedId !== null && !selectedPayments.includes(matchedId)) {
@@ -63,43 +67,150 @@ export function PaymentMethods({ reportData, masters, selectedPayments }: Paymen
             }
             
             return {
+                id: matchedId,
                 metodo: displayMetodo,
                 monto: row.monto
             }
         }).filter(Boolean) as any[]
     }
     
+    // Sort all calculated methods by amount descending
     metodosCalculados.sort((a, b) => b.monto - a.monto)
+
+    // Categorization logic
+    const getCategory = (metodo: string, id: number | null) => {
+        const nameLower = (metodo || '').toLowerCase();
+        
+        // Remove accents for robust Spanish matching
+        const normalized = nameLower.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        
+        if (normalized.includes('efectivo')) {
+            return 'efectivo';
+        }
+        
+        if (
+            normalized.includes('tarjeta') ||
+            normalized.includes('card') ||
+            normalized.includes('pos') ||
+            normalized.includes('credito') ||
+            normalized.includes('debito') ||
+            nameLower === 'metodo 2' ||
+            nameLower === '2' ||
+            id === 2
+        ) {
+            return 'tarjeta';
+        }
+        
+        return 'otros';
+    }
+
+    const grupoEfectivo = metodosCalculados.filter(m => getCategory(m.metodo, m.id) === 'efectivo')
+    const grupoTarjeta = metodosCalculados.filter(m => getCategory(m.metodo, m.id) === 'tarjeta')
+    const grupoOtros = metodosCalculados.filter(m => getCategory(m.metodo, m.id) === 'otros')
+
+    const totalEfectivo = grupoEfectivo.reduce((sum, m) => sum + m.monto, 0)
+    const totalTarjeta = grupoTarjeta.reduce((sum, m) => sum + m.monto, 0)
+    const totalOtros = grupoOtros.reduce((sum, m) => sum + m.monto, 0)
 
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <CreditCard className="h-5 w-5" />
-                    Cantidad por Efectivo y Tarjeta
+        <Card className="border-2 border-primary/20 shadow-2xl">
+            <CardHeader className="border-b border-border/50 pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg font-black tracking-tight italic">
+                    <CreditCard className="h-5 w-5 text-primary not-italic" />
+                    CANTIDAD POR EFECTIVO Y TARJETA
                 </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-6">
                 <div className="overflow-x-auto">
-                    <table className="w-full max-w-2xl mx-auto">
+                    <table className="w-full max-w-2xl mx-auto border-collapse">
                         <thead>
-                            <tr className="border-b border-border">
-                                <th className="px-4 py-3 text-left text-sm font-semibold">Método de Pago</th>
-                                <th className="px-4 py-3 text-right text-sm font-semibold">Monto Total</th>
+                            <tr className="border-b border-border/80">
+                                <th className="px-4 py-3 text-left text-xs font-black tracking-wider uppercase text-muted-foreground">Categoría / Método</th>
+                                <th className="px-4 py-3 text-right text-xs font-black tracking-wider uppercase text-muted-foreground">Monto Total</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {metodosCalculados.map((m: any, idx: number) => (
-                                <tr key={idx} className="border-b border-border/50 hover:bg-muted/50 transition-colors">
-                                    <td className="px-4 py-3 text-sm font-medium text-slate-200">
-                                        {m.metodo}
-                                    </td>
-                                    <td className={`px-4 py-3 text-right text-sm font-bold ${m.monto > 0 ? 'text-emerald-400' : 'text-slate-600'}`}>
-                                        {formatCurrency(m.monto)}
-                                    </td>
+                            {/* Grupo Efectivo */}
+                            <tr className="bg-primary/5 border-b border-primary/10">
+                                <td className="px-4 py-2.5 text-xs font-black text-primary flex items-center gap-2 uppercase tracking-wider">
+                                    <span>💵</span> Efectivo
+                                </td>
+                                <td className="px-4 py-2.5 text-right text-xs font-black text-primary">
+                                    {formatCurrency(totalEfectivo)}
+                                </td>
+                            </tr>
+                            {grupoEfectivo.length === 0 ? (
+                                <tr className="border-b border-border/20">
+                                    <td className="pl-10 pr-4 py-2 text-xs italic text-muted-foreground/60">No hay registros de efectivo</td>
+                                    <td className="px-4 py-2 text-right text-xs italic text-slate-600">{formatCurrency(0)}</td>
                                 </tr>
-                            ))}
+                            ) : (
+                                grupoEfectivo.map((m, idx) => (
+                                    <tr key={`efectivo-${idx}`} className="border-b border-border/20 hover:bg-muted/40 transition-colors">
+                                        <td className="pl-10 pr-4 py-2 text-xs font-medium text-slate-300">
+                                            {m.metodo}
+                                        </td>
+                                        <td className={`px-4 py-2 text-right text-xs font-bold ${m.monto > 0 ? 'text-emerald-400' : 'text-slate-600'}`}>
+                                            {formatCurrency(m.monto)}
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+
+                            {/* Grupo Tarjeta */}
+                            <tr className="bg-primary/5 border-b border-primary/10 mt-2">
+                                <td className="px-4 py-2.5 text-xs font-black text-primary flex items-center gap-2 uppercase tracking-wider">
+                                    <span>💳</span> Tarjeta
+                                </td>
+                                <td className="px-4 py-2.5 text-right text-xs font-black text-primary">
+                                    {formatCurrency(totalTarjeta)}
+                                </td>
+                            </tr>
+                            {grupoTarjeta.length === 0 ? (
+                                <tr className="border-b border-border/20">
+                                    <td className="pl-10 pr-4 py-2 text-xs italic text-muted-foreground/60">No hay registros de tarjeta</td>
+                                    <td className="px-4 py-2 text-right text-xs italic text-slate-600">{formatCurrency(0)}</td>
+                                </tr>
+                            ) : (
+                                grupoTarjeta.map((m, idx) => (
+                                    <tr key={`tarjeta-${idx}`} className="border-b border-border/20 hover:bg-muted/40 transition-colors">
+                                        <td className="pl-10 pr-4 py-2 text-xs font-medium text-slate-300">
+                                            {m.metodo}
+                                        </td>
+                                        <td className={`px-4 py-2 text-right text-xs font-bold ${m.monto > 0 ? 'text-emerald-400' : 'text-slate-600'}`}>
+                                            {formatCurrency(m.monto)}
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+
+                            {/* Grupo Otros */}
+                            <tr className="bg-primary/5 border-b border-primary/10 mt-2">
+                                <td className="px-4 py-2.5 text-xs font-black text-primary flex items-center gap-2 uppercase tracking-wider">
+                                    <span>⚙️</span> Otros
+                                </td>
+                                <td className="px-4 py-2.5 text-right text-xs font-black text-primary">
+                                    {formatCurrency(totalOtros)}
+                                </td>
+                            </tr>
+                            {grupoOtros.length === 0 ? (
+                                <tr className="border-b border-border/20">
+                                    <td className="pl-10 pr-4 py-2 text-xs italic text-muted-foreground/60">No hay otros registros</td>
+                                    <td className="px-4 py-2 text-right text-xs italic text-slate-600">{formatCurrency(0)}</td>
+                                </tr>
+                            ) : (
+                                grupoOtros.map((m, idx) => (
+                                    <tr key={`otros-${idx}`} className="border-b border-border/20 hover:bg-muted/40 transition-colors">
+                                        <td className="pl-10 pr-4 py-2 text-xs font-medium text-slate-300">
+                                            {m.metodo}
+                                        </td>
+                                        <td className={`px-4 py-2 text-right text-xs font-bold ${m.monto > 0 ? 'text-emerald-400' : 'text-slate-600'}`}>
+                                            {formatCurrency(m.monto)}
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
                     </table>
                 </div>

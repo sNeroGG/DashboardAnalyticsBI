@@ -251,7 +251,9 @@ def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=
         if not o_pays and not payments:
              summary_days[d_bus]["restaurante_efectivo"] += o_total
              pm_name = "Efectivo"
-             summary_metodos[pm_name] = summary_metodos.get(pm_name, 0.0) + o_total
+             if pm_name not in summary_metodos:
+                 summary_metodos[pm_name] = {"id": 3, "monto": 0.0}
+             summary_metodos[pm_name]["monto"] += o_total
         else:
             for pr in o_pays:
                 pm_val = pr.get("payment_method_id")
@@ -262,7 +264,15 @@ def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=
                 if not pm_name:
                     pm_name = f"Metodo {pm_id}"
                 pm_amount = pr.get("amount", 0.0)
-                summary_metodos[pm_name] = summary_metodos.get(pm_name, 0.0) + pm_amount
+                
+                if pm_name not in summary_metodos:
+                    try:
+                        num_id = int(pm_id)
+                    except ValueError:
+                        num_id = pm_id
+                    summary_metodos[pm_name] = {"id": num_id, "monto": 0.0}
+                summary_metodos[pm_name]["monto"] += pm_amount
+                
                 if pm_id == "2":
                     summary_days[d_bus]["tarjeta"] += pm_amount
                 else:
@@ -286,8 +296,14 @@ def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=
             uid_str = str(get_id(o.get("user_id")))
             vendedor_name = user_map.get(uid_str) or (o.get("user_id")[1] if isinstance(o.get("user_id"), list) else "Cajero General")
 
+        vendedor_id = get_id(o.get("order_creator_id")) if "order_creator_id" in order_creator_fields and o.get("order_creator_id") else get_id(o.get("user_id"))
+        try:
+            vendedor_id = int(vendedor_id) if vendedor_id is not None else None
+        except ValueError:
+            pass
+
         if vendedor_name not in summary_users:
-            summary_users[vendedor_name] = {"nombre": vendedor_name, "cuentas": 0, "ventas": 0.0}
+            summary_users[vendedor_name] = {"id": vendedor_id, "nombre": vendedor_name, "cuentas": 0, "ventas": 0.0}
         summary_users[vendedor_name]["cuentas"] += 1
         summary_users[vendedor_name]["ventas"] += o_total
 
@@ -339,7 +355,7 @@ def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=
         "status": "success",
         "data": report_list,
         "usuarios": usuarios_list,
-        "metodos": [{"metodo": k, "monto": v} for k, v in summary_metodos.items()]
+        "metodos": [{"id": v["id"], "metodo": k, "monto": v["monto"]} for k, v in summary_metodos.items()]
     }
 
 def generate_active_sessions_report(odoo):
