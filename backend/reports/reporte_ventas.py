@@ -420,13 +420,29 @@ def generate_active_sessions_report(odoo):
             users_data = odoo.search("res.users", [("id", "in", list(set(user_ids)))], ["id", "login", "name", "partner_id"])
             for u in users_data:
                 u_id = u["id"]
-                u_name = u.get("name") or u.get("login")
-                if not u_name and "partner_id" in u:
+                u_name = None
+                
+                # Intentamos extraer el nombre desde partner_id primero, que contiene el nombre real de la persona (ej. "YAMI ESTRADA")
+                if "partner_id" in u:
                     pid = u["partner_id"]
-                    if isinstance(pid, list) and len(pid) > 1:
+                    if isinstance(pid, list) and len(pid) > 1 and isinstance(pid[1], str):
                         u_name = pid[1]
+                    elif isinstance(pid, list) and len(pid) > 0 and isinstance(pid[0], dict) and "name" in pid[0]:
+                        u_name = pid[0]["name"]
                     elif isinstance(pid, dict) and "name" in pid:
                         u_name = pid["name"]
+                
+                # Fallback al name o login de res.users si no se pudo por partner_id
+                if not u_name:
+                    u_name = u.get("name") or u.get("login")
+                    
+                # Si el nombre obtenido sigue pareciendo un correo, intentamos limpiarlo o buscar alternativa
+                if u_name and "@" in u_name and "partner_id" in u:
+                    # En caso de que se haya colado el correo en u_name, forzar búsqueda en el segundo elemento de partner_id si existe
+                    pid = u["partner_id"]
+                    if isinstance(pid, list) and len(pid) > 1 and isinstance(pid[1], str):
+                        u_name = pid[1]
+                
                 real_users[str(u_id)] = u_name or f"Usuario {u_id}"
         except Exception as e:
             print(f"Error querying active sessions user names: {e}")
