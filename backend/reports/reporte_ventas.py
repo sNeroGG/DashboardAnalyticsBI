@@ -417,10 +417,10 @@ def generate_active_sessions_report(odoo):
     real_users = {}
     if user_ids:
         try:
-            users_data = odoo.search("res.users", [("id", "in", list(set(user_ids)))], ["id", "name", "partner_id"])
+            users_data = odoo.search("res.users", [("id", "in", list(set(user_ids)))], ["id", "login", "name", "partner_id"])
             for u in users_data:
                 u_id = u["id"]
-                u_name = u.get("name")
+                u_name = u.get("login") or u.get("name")
                 if not u_name and "partner_id" in u:
                     pid = u["partner_id"]
                     if isinstance(pid, list) and len(pid) > 1:
@@ -509,16 +509,19 @@ def generate_active_sessions_report(odoo):
         s_id = s["id"]
         s_user = s.get("user_id")
         
-        # Extracción súper-robusta de nombre del cajero
+        # Extracción súper-robusta de nombre de usuario del cajero (priorizando login/username real de la base de datos)
         cashier_name = None
-        if s_user:
+        uid = get_id(s_user)
+        if uid:
+            cashier_name = real_users.get(str(uid)) or user_map.get(str(uid))
+            
+        if not cashier_name and s_user:
             if isinstance(s_user, (list, tuple)) and len(s_user) > 1 and isinstance(s_user[1], str):
                 cashier_name = s_user[1]
-            else:
-                uid = get_id(s_user)
-                if uid:
-                    cashier_name = real_users.get(str(uid)) or user_map.get(str(uid)) or f"Usuario {uid}"
-                    
+                
+        if not cashier_name and uid:
+            cashier_name = f"Usuario {uid}"
+            
         if not cashier_name:
             cashier_name = "Cajero Desconocido"
         
