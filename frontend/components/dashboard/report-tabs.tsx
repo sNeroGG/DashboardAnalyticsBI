@@ -125,8 +125,8 @@ export function PaymentMethods({ reportData, masters, selectedPayments }: Paymen
     return (
         <Card className="border-2 border-primary/20 shadow-2xl">
             <CardHeader className="border-b border-border/50 pb-4">
-                <CardTitle className="flex items-center gap-2 text-lg font-black tracking-tight italic">
-                    <CreditCard className="h-5 w-5 text-primary not-italic" />
+                <CardTitle className="flex items-center gap-2">
+                    <CreditCard className="h-5 w-5 text-primary" />
                     CANTIDAD POR EFECTIVO Y TARJETA
                 </CardTitle>
             </CardHeader>
