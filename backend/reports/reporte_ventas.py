@@ -32,6 +32,37 @@ def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=
     user_map = {str(u["id"]): u["name"] for u in masters.get("res.users", [])}
     payment_map = {str(p["id"]): p["name"] for p in masters.get("pos.payment.method", [])}
 
+    if not payment_map:
+        try:
+            print("[REPORT VENTAS] payment_map está vacío, intentando descargar métodos de pago de Odoo...")
+            pm_data = odoo.search("pos.payment.method", [], ["id", "name"])
+            payment_map = {str(p["id"]): p["name"] for p in pm_data}
+            print(f"[REPORT VENTAS] Se descargaron {len(payment_map)} métodos de pago directamente de Odoo.")
+        except Exception as e:
+            print(f"[REPORT VENTAS] Error descargando pos.payment.method dinámicamente: {e}")
+
+    if not user_map:
+        try:
+            print("[REPORT VENTAS] user_map está vacío, intentando descargar usuarios de Odoo...")
+            users_data = odoo.search("res.users", [], ["id", "name", "partner_id"])
+            for item in users_data:
+                if "name" not in item and "partner_id" in item:
+                    pid = item["partner_id"]
+                    if isinstance(pid, list) and len(pid) > 0 and isinstance(pid[0], dict) and "name" in pid[0]:
+                        item["name"] = pid[0]["name"]
+                    elif isinstance(pid, list) and len(pid) > 1 and isinstance(pid[1], str):
+                        item["name"] = pid[1]
+                    elif isinstance(pid, dict) and "name" in pid:
+                        item["name"] = pid["name"]
+                    else:
+                        item["name"] = f"Usuario {item.get('id', '?')}"
+                elif "name" not in item:
+                    item["name"] = f"Usuario {item.get('id', '?')}"
+            user_map = {str(u["id"]): u["name"] for u in users_data}
+            print(f"[REPORT VENTAS] Se descargaron {len(user_map)} usuarios directamente de Odoo.")
+        except Exception as e:
+            print(f"[REPORT VENTAS] Error descargando res.users dinámicamente: {e}")
+
     # Detección dinámica de campos en pos.order
     base_fields = ["id", "name", "date_order", "amount_total", "state", "user_id", "tip_amount", "session_id", "customer_count"]
     order_creator_fields = []
@@ -259,8 +290,23 @@ def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=
                 pm_val = pr.get("payment_method_id")
                 pm_id = str(get_id(pm_val))
                 pm_name = payment_map.get(pm_id)
-                if not pm_name and isinstance(pm_val, (list, tuple)) and len(pm_val) > 1 and isinstance(pm_val[1], str):
-                    pm_name = pm_val[1]
+                if not pm_name:
+                    if isinstance(pm_val, (list, tuple)) and len(pm_val) > 1 and isinstance(pm_val[1], str):
+                        pm_name = pm_val[1]
+                    elif isinstance(pm_val, dict):
+                        pm_name = pm_val.get("name") or pm_val.get("display_name")
+                
+                # Si todavía no tenemos el nombre, intentamos buscarlo directamente en Odoo
+                if not pm_name and pm_id:
+                    try:
+                        pm_record = odoo.search("pos.payment.method", [("id", "=", int(pm_id))], ["id", "name"])
+                        if pm_record and len(pm_record) > 0:
+                            pm_name = pm_record[0].get("name")
+                            # Cachear en el mapa para no repetir peticiones
+                            payment_map[pm_id] = pm_name
+                    except Exception as e:
+                        print(f"Error recuperando método de pago {pm_id} de Odoo: {e}")
+
                 if not pm_name:
                     pm_name = f"Metodo {pm_id}"
                 pm_amount = pr.get("amount", 0.0)
