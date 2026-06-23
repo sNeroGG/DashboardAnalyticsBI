@@ -49,7 +49,7 @@ export function PaymentMethods({ reportData, masters, selectedPayments }: Paymen
         metodosCalculados = (reportData.metodos || []).map((row: any) => {
             let displayMetodo = row.metodo
             let matchedId: number | null = null
-            
+
             if (row.id !== undefined && row.id !== null) {
                 matchedId = Number(row.id)
             } else if (row.metodo && row.metodo.startsWith('Metodo ')) {
@@ -61,11 +61,11 @@ export function PaymentMethods({ reportData, masters, selectedPayments }: Paymen
             if (matchedMaster) {
                 displayMetodo = matchedMaster.name
             }
-            
+
             if (selectedPayments.length > 0 && matchedId !== null && !selectedPayments.includes(matchedId)) {
                 return null
             }
-            
+
             return {
                 id: matchedId,
                 metodo: displayMetodo,
@@ -73,14 +73,14 @@ export function PaymentMethods({ reportData, masters, selectedPayments }: Paymen
             }
         }).filter(Boolean) as any[]
     }
-    
+
     // Sort all calculated methods by amount descending
     metodosCalculados.sort((a, b) => b.monto - a.monto)
 
     // Categorization logic
     const getCategory = (metodo: string, id: number | null) => {
         const nameLower = (metodo || '').toLowerCase().trim();
-        
+
         // 1. Check for Tarjeta (Card) keywords or ID 2
         const normalized = nameLower.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         if (
@@ -95,7 +95,7 @@ export function PaymentMethods({ reportData, masters, selectedPayments }: Paymen
         ) {
             return 'tarjeta';
         }
-        
+
         // 2. Check for Efectivo (Cash) keywords
         if (normalized.includes('efectivo')) {
             return 'efectivo';
@@ -108,7 +108,7 @@ export function PaymentMethods({ reportData, masters, selectedPayments }: Paymen
         if (isPlaceholder) {
             return 'efectivo';
         }
-        
+
         // 4. Any other specific name goes to Otros
         return 'otros';
     }
@@ -127,7 +127,7 @@ export function PaymentMethods({ reportData, masters, selectedPayments }: Paymen
             <CardHeader className="border-b border-border/50 pb-4">
                 <CardTitle className="flex items-center gap-2">
                     <CreditCard className="h-5 w-5 text-primary" />
-                    CANTIDAD POR EFECTIVO Y TARJETA
+                    Cantidad por Efectivo y Tarjeta
                 </CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
