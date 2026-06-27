@@ -19,13 +19,14 @@ export function PaymentMethods({ reportData, masters, selectedPayments }: Paymen
         metodosCalculados = metodosMaestros.map(m => {
             // Encontrar lo que devolvió el backend para este método
             const backP = reportData.metodos?.find((row: any) => {
+                if (row.id !== undefined && row.id !== null && m.id !== undefined && m.id !== null) {
+                    if (Number(row.id) === Number(m.id)) return true;
+                }
                 if (!row.metodo) return false;
-                const rowMetodoLower = String(row.metodo).toLowerCase();
-                const mNameLower = String(m.name).toLowerCase();
+                const rowMetodoLower = String(row.metodo).toLowerCase().trim();
+                const mNameLower = String(m.name).toLowerCase().trim();
                 return (
                     rowMetodoLower === mNameLower ||
-                    rowMetodoLower.includes(mNameLower) ||
-                    mNameLower.includes(rowMetodoLower) ||
                     row.metodo === `Metodo ${m.id}` ||
                     row.metodo === String(m.id)
                 );
@@ -44,6 +45,19 @@ export function PaymentMethods({ reportData, masters, selectedPayments }: Paymen
                 monto: monto
             }
         })
+
+        // Añadir métodos virtuales (como Propina) devueltos por el backend que no están en Odoo pos.payment.method
+        const virtualMethods = (reportData.metodos || []).filter((row: any) => {
+            const isVirtual = String(row.metodo).toLowerCase().includes('propina') || row.id === 99 || row.id === 399;
+            const alreadyMapped = metodosCalculados.some(m => m.id === row.id || m.metodo.toLowerCase() === String(row.metodo).toLowerCase());
+            return isVirtual && !alreadyMapped;
+        }).map((row: any) => ({
+            id: row.id,
+            metodo: row.metodo,
+            monto: row.monto
+        }));
+
+        metodosCalculados = [...metodosCalculados, ...virtualMethods];
     } else {
         // Robust Fallback: Usar los métodos devueltos por el backend si no hay maestros cargados
         metodosCalculados = (reportData.metodos || []).map((row: any) => {
@@ -81,6 +95,16 @@ export function PaymentMethods({ reportData, masters, selectedPayments }: Paymen
     const getCategory = (metodo: string, id: number | null) => {
         const nameLower = (metodo || '').toLowerCase().trim();
 
+        // 0. Check for Propina (Tip) keywords or IDs
+        if (
+            nameLower.includes('propina') ||
+            nameLower.includes('tip') ||
+            id === 99 ||
+            id === 399
+        ) {
+            return 'propina';
+        }
+
         // 1. Check for Tarjeta (Card) keywords or ID 2
         const normalized = nameLower.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         if (
@@ -115,10 +139,12 @@ export function PaymentMethods({ reportData, masters, selectedPayments }: Paymen
 
     const grupoEfectivo = metodosCalculados.filter(m => getCategory(m.metodo, m.id) === 'efectivo')
     const grupoTarjeta = metodosCalculados.filter(m => getCategory(m.metodo, m.id) === 'tarjeta')
+    const grupoPropina = metodosCalculados.filter(m => getCategory(m.metodo, m.id) === 'propina')
     const grupoOtros = metodosCalculados.filter(m => getCategory(m.metodo, m.id) === 'otros')
 
     const totalEfectivo = grupoEfectivo.reduce((sum, m) => sum + m.monto, 0)
     const totalTarjeta = grupoTarjeta.reduce((sum, m) => sum + m.monto, 0)
+    const totalPropina = grupoPropina.reduce((sum, m) => sum + m.monto, 0)
     const totalOtros = grupoOtros.reduce((sum, m) => sum + m.monto, 0)
 
 
@@ -184,6 +210,32 @@ export function PaymentMethods({ reportData, masters, selectedPayments }: Paymen
                             ) : (
                                 grupoTarjeta.map((m, idx) => (
                                     <tr key={`tarjeta-${idx}`} className="border-b border-border/20 hover:bg-muted/40 transition-colors">
+                                        <td className="pl-10 pr-4 py-2 text-xs font-medium text-slate-300">
+                                            {m.metodo}
+                                        </td>
+                                        <td className={`px-4 py-2 text-right text-xs font-bold ${m.monto > 0 ? 'text-emerald-400' : 'text-slate-600'}`}>
+                                            {formatCurrency(m.monto)}
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                            {/* Grupo Propina */}
+                            <tr className="bg-primary/5 border-b border-primary/10 mt-2">
+                                <td className="px-4 py-2.5 text-xs font-black text-primary flex items-center gap-2 uppercase tracking-wider">
+                                    <span>🪙</span> Propina
+                                </td>
+                                <td className="px-4 py-2.5 text-right text-xs font-black text-primary">
+                                    {formatCurrency(totalPropina)}
+                                </td>
+                            </tr>
+                            {grupoPropina.length === 0 ? (
+                                <tr className="border-b border-border/20">
+                                    <td className="pl-10 pr-4 py-2 text-xs italic text-muted-foreground/60">No hay registros de propina</td>
+                                    <td className="px-4 py-2 text-right text-xs italic text-slate-600">{formatCurrency(0)}</td>
+                                </tr>
+                            ) : (
+                                grupoPropina.map((m, idx) => (
+                                    <tr key={`propina-${idx}`} className="border-b border-border/20 hover:bg-muted/40 transition-colors">
                                         <td className="pl-10 pr-4 py-2 text-xs font-medium text-slate-300">
                                             {m.metodo}
                                         </td>

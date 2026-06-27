@@ -280,12 +280,20 @@ def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=
         summary_days[d_bus]["total_personas"] += o_personas
         
         if not o_pays and not payments:
-             summary_days[d_bus]["restaurante_efectivo"] += o_total
+             net_amount = o_total - o_tip
+             summary_days[d_bus]["restaurante_efectivo"] += net_amount
              pm_name = "Efectivo"
              if pm_name not in summary_metodos:
                  summary_metodos[pm_name] = {"id": 3, "monto": 0.0}
-             summary_metodos[pm_name]["monto"] += o_total
+             summary_metodos[pm_name]["monto"] += net_amount
+             
+             if o_tip > 0:
+                 virtual_pm_name = "Propina"
+                 if virtual_pm_name not in summary_metodos:
+                     summary_metodos[virtual_pm_name] = {"id": 99, "monto": 0.0}
+                 summary_metodos[virtual_pm_name]["monto"] += o_tip
         else:
+            total_order_payments = sum(pr.get("amount", 0.0) for pr in o_pays)
             for pr in o_pays:
                 pm_val = pr.get("payment_method_id")
                 pm_id = str(get_id(pm_val))
@@ -311,18 +319,30 @@ def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=
                     pm_name = f"Metodo {pm_id}"
                 pm_amount = pr.get("amount", 0.0)
                 
+                # Restar la propina proporcionalmente
+                pm_tip = 0.0
+                if o_tip > 0 and total_order_payments > 0:
+                    pm_tip = o_tip * (pm_amount / total_order_payments)
+                net_amount = pm_amount - pm_tip
+                
                 if pm_name not in summary_metodos:
                     try:
                         num_id = int(pm_id)
                     except ValueError:
                         num_id = pm_id
                     summary_metodos[pm_name] = {"id": num_id, "monto": 0.0}
-                summary_metodos[pm_name]["monto"] += pm_amount
+                summary_metodos[pm_name]["monto"] += net_amount
+                
+                if pm_tip > 0:
+                    virtual_pm_name = "Propina"
+                    if virtual_pm_name not in summary_metodos:
+                        summary_metodos[virtual_pm_name] = {"id": 99, "monto": 0.0}
+                    summary_metodos[virtual_pm_name]["monto"] += pm_tip
                 
                 if pm_id == "2":
-                    summary_days[d_bus]["tarjeta"] += pm_amount
+                    summary_days[d_bus]["tarjeta"] += net_amount
                 else:
-                    summary_days[d_bus]["restaurante_efectivo"] += pm_amount
+                    summary_days[d_bus]["restaurante_efectivo"] += net_amount
 
         # VENDEDOR (order_creator_name o order_creator_id con fallback a user_id)
         vendedor_name = None
@@ -686,15 +706,23 @@ def generate_active_sessions_report(odoo):
         
         o_pays = [p for p in payments_records if get_id(p.get("pos_order_id")) == o_id]
         if not o_pays:
-            session_reports[s_id]["restaurante_efectivo"] += o_total
+            session_reports[s_id]["restaurante_efectivo"] += (o_total - o_tip)
         else:
+            total_order_payments = sum(pr.get("amount", 0.0) for pr in o_pays)
             for pr in o_pays:
                 pm_id = str(get_id(pr.get("payment_method_id")))
                 pm_amount = pr.get("amount", 0.0)
+                
+                # Restar la propina proporcionalmente
+                pm_tip = 0.0
+                if o_tip > 0 and total_order_payments > 0:
+                    pm_tip = o_tip * (pm_amount / total_order_payments)
+                net_amount = pm_amount - pm_tip
+                
                 if pm_id == "2":
-                    session_reports[s_id]["tarjeta"] += pm_amount
+                    session_reports[s_id]["tarjeta"] += net_amount
                 else:
-                    session_reports[s_id]["restaurante_efectivo"] += pm_amount
+                    session_reports[s_id]["restaurante_efectivo"] += net_amount
                     
         session_reports[s_id]["cuentas"].append({
             "id": o_id,
