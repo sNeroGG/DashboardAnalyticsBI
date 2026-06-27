@@ -288,9 +288,9 @@ def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=
              summary_metodos[pm_name]["monto"] += net_amount
              
              if o_tip > 0:
-                 virtual_pm_name = "Propina"
+                 virtual_pm_name = "Propina Efectivo"
                  if virtual_pm_name not in summary_metodos:
-                     summary_metodos[virtual_pm_name] = {"id": 99, "monto": 0.0}
+                     summary_metodos[virtual_pm_name] = {"id": 98, "monto": 0.0}
                  summary_metodos[virtual_pm_name]["monto"] += o_tip
         else:
             total_order_payments = sum(pr.get("amount", 0.0) for pr in o_pays)
@@ -334,9 +334,15 @@ def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=
                 summary_metodos[pm_name]["monto"] += net_amount
                 
                 if pm_tip > 0:
-                    virtual_pm_name = "Propina"
+                    if pm_id == "2":
+                        virtual_pm_name = "Propina Tarjeta"
+                        virtual_id = 99
+                    else:
+                        virtual_pm_name = "Propina Efectivo"
+                        virtual_id = 98
+                        
                     if virtual_pm_name not in summary_metodos:
-                        summary_metodos[virtual_pm_name] = {"id": 99, "monto": 0.0}
+                        summary_metodos[virtual_pm_name] = {"id": virtual_id, "monto": 0.0}
                     summary_metodos[virtual_pm_name]["monto"] += pm_tip
                 
                 if pm_id == "2":

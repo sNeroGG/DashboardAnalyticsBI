@@ -48,7 +48,7 @@ export function PaymentMethods({ reportData, masters, selectedPayments }: Paymen
 
         // Añadir métodos virtuales (como Propina) devueltos por el backend que no están en Odoo pos.payment.method
         const virtualMethods = (reportData.metodos || []).filter((row: any) => {
-            const isVirtual = String(row.metodo).toLowerCase().includes('propina') || row.id === 99 || row.id === 399;
+            const isVirtual = String(row.metodo).toLowerCase().includes('propina') || row.id === 98 || row.id === 99 || row.id === 399;
             const alreadyMapped = metodosCalculados.some(m => m.id === row.id || m.metodo.toLowerCase() === String(row.metodo).toLowerCase());
             return isVirtual && !alreadyMapped;
         }).map((row: any) => ({
@@ -133,19 +133,17 @@ export function PaymentMethods({ reportData, masters, selectedPayments }: Paymen
             return 'efectivo';
         }
 
-        // 4. Any other specific name goes to Otros
-        return 'otros';
+        // 4. Any other specific name goes to Efectivo (since the backend treats everything except ID 2 and Propina as Cash/Efectivo)
+        return 'efectivo';
     }
 
     const grupoEfectivo = metodosCalculados.filter(m => getCategory(m.metodo, m.id) === 'efectivo')
     const grupoTarjeta = metodosCalculados.filter(m => getCategory(m.metodo, m.id) === 'tarjeta')
     const grupoPropina = metodosCalculados.filter(m => getCategory(m.metodo, m.id) === 'propina')
-    const grupoOtros = metodosCalculados.filter(m => getCategory(m.metodo, m.id) === 'otros')
 
     const totalEfectivo = grupoEfectivo.reduce((sum, m) => sum + m.monto, 0)
     const totalTarjeta = grupoTarjeta.reduce((sum, m) => sum + m.monto, 0)
     const totalPropina = grupoPropina.reduce((sum, m) => sum + m.monto, 0)
-    const totalOtros = grupoOtros.reduce((sum, m) => sum + m.monto, 0)
 
 
     return (
@@ -246,32 +244,7 @@ export function PaymentMethods({ reportData, masters, selectedPayments }: Paymen
                                 ))
                             )}
 
-                            {/* Grupo Otros */}
-                            <tr className="bg-primary/5 border-b border-primary/10 mt-2">
-                                <td className="px-4 py-2.5 text-xs font-black text-primary flex items-center gap-2 uppercase tracking-wider">
-                                    <span>⚙️</span> Otros
-                                </td>
-                                <td className="px-4 py-2.5 text-right text-xs font-black text-primary">
-                                    {formatCurrency(totalOtros)}
-                                </td>
-                            </tr>
-                            {grupoOtros.length === 0 ? (
-                                <tr className="border-b border-border/20">
-                                    <td className="pl-10 pr-4 py-2 text-xs italic text-muted-foreground/60">No hay otros registros</td>
-                                    <td className="px-4 py-2 text-right text-xs italic text-slate-600">{formatCurrency(0)}</td>
-                                </tr>
-                            ) : (
-                                grupoOtros.map((m, idx) => (
-                                    <tr key={`otros-${idx}`} className="border-b border-border/20 hover:bg-muted/40 transition-colors">
-                                        <td className="pl-10 pr-4 py-2 text-xs font-medium text-slate-300">
-                                            {m.metodo}
-                                        </td>
-                                        <td className={`px-4 py-2 text-right text-xs font-bold ${m.monto > 0 ? 'text-emerald-400' : 'text-slate-600'}`}>
-                                            {formatCurrency(m.monto)}
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
+
                         </tbody>
                     </table>
                 </div>
