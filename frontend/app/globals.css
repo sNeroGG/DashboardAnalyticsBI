@@ -37,10 +37,16 @@
 }
 
 @media print {
+  @page {
+    margin: 0; /* Quita los encabezados y pies de página del navegador (título, url, fecha) */
+  }
+
   html, body {
     background-color: white !important;
     background: white !important;
     color: black !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
   
   body * {
@@ -56,6 +62,9 @@
     left: 0;
     top: 0;
     width: 100%;
-    height: auto;
+    min-height: 100%;
+    padding: 1.2cm !important;
+    box-sizing: border-box;
+    margin: 0 !important;
   }
 }
