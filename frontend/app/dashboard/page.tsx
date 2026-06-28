@@ -538,6 +538,8 @@ export default function DashboardPage() {
                 isOpen={isReportModalOpen}
                 onClose={() => setIsReportModalOpen(false)}
                 reportData={reportData}
+                dateFrom={dateFrom}
+                dateTo={dateTo}
                 onPrintSummary={handlePrintSummary}
                 onPrintSalesReport={handlePrintSalesReport}
             />
