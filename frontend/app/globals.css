@@ -35,3 +35,27 @@
     @apply bg-background text-foreground;
   }
 }
+
+@media print {
+  html, body {
+    background-color: white !important;
+    background: white !important;
+    color: black !important;
+  }
+  
+  body * {
+    visibility: hidden;
+  }
+  
+  .print-layout, .print-layout * {
+    visibility: visible;
+  }
+  
+  .print-layout {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: auto;
+  }
+}

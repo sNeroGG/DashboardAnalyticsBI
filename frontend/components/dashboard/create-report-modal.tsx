@@ -60,22 +60,31 @@ export function CreateReportModal({ isOpen, onClose, reportData, dateFrom, dateT
     const handleConfirm = async () => {
         setIsGenerating(true)
         try {
-            if (reportType === 'summary') {
-                const from = modifyPeriod ? customDateFrom : dateFrom
-                const to = modifyPeriod ? customDateTo : dateTo
-                await onGenerateReport('summary', 'period', null, from, to)
-            } else {
-                if (productsScope === 'session') {
-                    await onGenerateReport('products', 'session', selectedSessionId)
-                } else if (productsScope === 'day') {
-                    await onGenerateReport('products', 'day', selectedDay)
-                } else {
-                    const from = modifyPeriod ? customDateFrom : dateFrom
-                    const to = modifyPeriod ? customDateTo : dateTo
-                    await onGenerateReport('products', 'period', null, from, to)
-                }
-            }
+            // Cerrar el modal primero para asegurar que se desmonte de la pantalla antes de la impresión
             onClose()
+
+            // Ejecutar el generador en el siguiente tick del event loop
+            setTimeout(async () => {
+                try {
+                    if (reportType === 'summary') {
+                        const from = modifyPeriod ? customDateFrom : dateFrom
+                        const to = modifyPeriod ? customDateTo : dateTo
+                        await onGenerateReport('summary', 'period', null, from, to)
+                    } else {
+                        if (productsScope === 'session') {
+                            await onGenerateReport('products', 'session', selectedSessionId)
+                        } else if (productsScope === 'day') {
+                            await onGenerateReport('products', 'day', selectedDay)
+                        } else {
+                            const from = modifyPeriod ? customDateFrom : dateFrom
+                            const to = modifyPeriod ? customDateTo : dateTo
+                            await onGenerateReport('products', 'period', null, from, to)
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error generating report inside timeout', error)
+                }
+            }, 50)
         } catch (error) {
             console.error('Error generating report from modal', error)
         } finally {
@@ -84,7 +93,7 @@ export function CreateReportModal({ isOpen, onClose, reportData, dateFrom, dateT
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-in fade-in duration-200 print:hidden">
             <div className="relative w-full max-w-lg rounded-2xl border-2 border-primary/20 bg-card p-6 shadow-2xl animate-in zoom-in-95 duration-200 text-card-foreground">
                 {/* Header */}
                 <div className="flex items-center justify-between border-b border-border/80 pb-4">

@@ -20,7 +20,7 @@ import { PrintSalesReport } from '@/components/dashboard/print-sales-report'
 import { dashboardAPI } from '@/lib/api'
 import type { ReportData, Masters, ActiveSession } from '@/lib/types'
 import { Button } from '@/components/ui/button'
-import { LogOut, RefreshCcw, LayoutDashboard, Database, BarChart2, Users, ShoppingBag, Activity, FileText, Clock } from 'lucide-react'
+import { LogOut, RefreshCcw, LayoutDashboard, Database, BarChart2, Users, ShoppingBag, Activity, FileText, Clock, Loader2 } from 'lucide-react'
 
 export default function DashboardPage() {
     const [dateFrom, setDateFrom] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'))
@@ -256,17 +256,28 @@ export default function DashboardPage() {
 
         let fetchedReportData = reportData
         // Si el periodo/día es diferente al del dashboard actual, cargamos en segundo plano
-        if (fetchFrom !== dateFrom || fetchTo !== dateTo) {
-            const { data } = await dashboardAPI.getReportVentas({
-                date_from: fetchFrom,
-                date_to: fetchTo,
-                users: [],
-                payments: [],
-                groups: [],
-                states: []
-            })
-            fetchedReportData = data
-            setTempPrintData(data)
+        const hasCustomPeriod = (customDateFrom && customDateFrom !== dateFrom) || (customDateTo && customDateTo !== dateTo)
+        if (scope === 'day' || hasCustomPeriod) {
+            setIsPrintLoading(true)
+            try {
+                const queryFrom = scope === 'day' ? `${target} 00:00:00` : `${customDateFrom} 00:00:00`
+                const queryTo = scope === 'day' ? `${target} 23:59:59` : `${customDateTo} 23:59:59`
+                
+                const { data } = await dashboardAPI.getReportVentas({
+                    date_from: queryFrom,
+                    date_to: queryTo,
+                    users: [],
+                    payments: [],
+                    groups: [],
+                    states: []
+                })
+                fetchedReportData = data
+                setTempPrintData(data)
+            } catch (error) {
+                console.error("Error fetching print report data", error)
+            } finally {
+                setIsPrintLoading(false)
+            }
         } else {
             setTempPrintData(null)
         }
@@ -308,7 +319,7 @@ export default function DashboardPage() {
         // Esperar a que se complete el flujo de impresión (se restaure el título) para resolver el modal
         return new Promise<void>((resolve) => {
             const checkInterval = setInterval(() => {
-                if (document.title === originalTitle) {
+                if (!isReadyToPrint) {
                     clearInterval(checkInterval)
                     // Limpiar datos temporales después de imprimir
                     setTimeout(() => {
@@ -321,7 +332,6 @@ export default function DashboardPage() {
             // Por seguridad, resolver después de 10 segundos
             setTimeout(() => {
                 clearInterval(checkInterval)
-                document.title = originalTitle
                 setTempPrintData(null)
                 resolve()
             }, 10000)
@@ -608,22 +618,22 @@ export default function DashboardPage() {
                 )}
             </div>
             {activeTab === 'active_session' && activeSessions ? (
-                <div className="hidden print:block bg-white text-black p-4 w-full h-full text-[10px] font-sans">
+                <div className="hidden print:block print-layout bg-white text-black p-4 w-full h-full text-[10px] font-sans">
                     <PrintActiveSessionsSummary sessions={activeSessions} isActive={isActiveSession} />
                 </div>
             ) : printLayout === 'sales_report' && (tempPrintData || reportData) ? (
-                <div className="hidden print:block bg-white text-black p-4 w-full h-full text-[10px] font-sans">
+                <div className="hidden print:block print-layout bg-white text-black p-4 w-full h-full text-[10px] font-sans">
                     <PrintSalesReport 
                         reportData={tempPrintData || reportData} 
                         scope={printReportScope} 
                         target={printReportTarget} 
-                        dateFrom={dateFrom} 
-                        dateTo={dateTo} 
+                        dateFrom={printDateFrom} 
+                        dateTo={printDateTo} 
                     />
                 </div>
             ) : (tempPrintData || reportData) ? (
-                <div className="hidden print:block bg-white text-black p-4 w-full h-full text-[10px] font-sans">
-                    <PrintSummary reportData={tempPrintData || reportData} dateFrom={dateFrom} dateTo={dateTo} />
+                <div className="hidden print:block print-layout bg-white text-black p-4 w-full h-full text-[10px] font-sans">
+                    <PrintSummary reportData={tempPrintData || reportData} dateFrom={printDateFrom} dateTo={printDateTo} />
                 </div>
             ) : null}
 
@@ -635,6 +645,13 @@ export default function DashboardPage() {
                 dateTo={dateTo}
                 onGenerateReport={handleGenerateReport}
             />
+
+            {isPrintLoading && (
+                <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-primary px-5 py-3 rounded-2xl text-primary-foreground shadow-2xl animate-bounce border-2 border-primary-foreground/20 print:hidden">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-xs font-black uppercase tracking-widest animate-pulse">Descargando reporte de Odoo...</span>
+                </div>
+            )}
         </>
     )
 }
