@@ -22,18 +22,30 @@ export function PrintSalesReport({ reportData, scope, target, dateFrom, dateTo }
 
     if (scope === 'session' && target !== null) {
         let targetSession: any = null
+        let sessionDate = ''
         if (reportData.data) {
             for (const day of reportData.data) {
                 const found = day.sesiones?.find((s: any) => s.id === Number(target))
                 if (found) {
                     targetSession = found
+                    sessionDate = day.fecha
                     break
                 }
             }
         }
 
         if (targetSession) {
-            titleRange = `${targetSession.name}`
+            let formattedDate = ''
+            if (sessionDate) {
+                const parts = sessionDate.split('-')
+                if (parts.length === 3) {
+                    formattedDate = `${parts[2]}-${parts[1]}-${parts[0]}`
+                } else {
+                    formattedDate = sessionDate
+                }
+            }
+            const cleanedName = targetSession.name.replace(/^SESION\s+/i, '').replace(/"/g, '').trim()
+            titleRange = formattedDate ? `sesion ${cleanedName}/${formattedDate}` : `sesion ${cleanedName}`
             accounts = (targetSession.cuentas || []).map((c: any) => ({
                 cliente: c.cliente || 'Cliente General',
                 total: c.total || 0

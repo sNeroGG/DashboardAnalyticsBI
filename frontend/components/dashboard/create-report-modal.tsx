@@ -39,7 +39,18 @@ export function CreateReportModal({ isOpen, onClose, reportData, dateFrom, dateT
                 if (day.sesiones) {
                     day.sesiones.forEach((s: any) => {
                         if (!list.some(item => item.id === s.id)) {
-                            list.push({ id: s.id, name: s.name })
+                            let formattedDate = ''
+                            if (day.fecha) {
+                                const parts = day.fecha.split('-')
+                                if (parts.length === 3) {
+                                    formattedDate = `${parts[2]}-${parts[1]}-${parts[0]}`
+                                } else {
+                                    formattedDate = day.fecha
+                                }
+                            }
+                            const cleanedName = s.name.replace(/^SESION\s+/i, '').replace(/"/g, '').trim()
+                            const displayName = formattedDate ? `sesion ${cleanedName}/${formattedDate}` : `sesion ${cleanedName}`
+                            list.push({ id: s.id, name: displayName })
                         }
                     })
                 }
@@ -92,18 +103,31 @@ export function CreateReportModal({ isOpen, onClose, reportData, dateFrom, dateT
         }
     }
 
+    const formatDateString = (dateStr: string) => {
+        if (!dateStr) return ''
+        const parts = dateStr.split('-')
+        if (parts.length === 3) {
+            return `${parts[2]}-${parts[1]}-${parts[0]}`
+        }
+        return dateStr
+    }
+
     // Determine the review date text
     let displayEvalDate = ''
     if (reportType === 'summary') {
-        displayEvalDate = modifyPeriod ? `${customDateFrom} al ${customDateTo}` : `${dateFrom} al ${dateTo}`
+        displayEvalDate = modifyPeriod 
+            ? `${formatDateString(customDateFrom)} al ${formatDateString(customDateTo)}` 
+            : `${formatDateString(dateFrom)} al ${formatDateString(dateTo)}`
     } else {
         if (productsScope === 'day') {
-            displayEvalDate = `Día específico: ${selectedDay}`
+            displayEvalDate = formatDateString(selectedDay)
         } else if (productsScope === 'session') {
             const foundSess = sessions.find(s => s.id === selectedSessionId)
-            displayEvalDate = foundSess ? `Sesión: ${foundSess.name}` : `Sesión ID: ${selectedSessionId}`
+            displayEvalDate = foundSess ? foundSess.name : `Sesión ID: ${selectedSessionId}`
         } else {
-            displayEvalDate = modifyPeriod ? `${customDateFrom} al ${customDateTo}` : `${dateFrom} al ${dateTo}`
+            displayEvalDate = modifyPeriod 
+                ? `${formatDateString(customDateFrom)} al ${formatDateString(customDateTo)}` 
+                : `${formatDateString(dateFrom)} al ${formatDateString(dateTo)}`
         }
     }
 
@@ -127,11 +151,11 @@ export function CreateReportModal({ isOpen, onClose, reportData, dateFrom, dateT
 
                 {/* Content */}
                 <div className="mt-5 space-y-5">
-                    {/* STEP 1: SELECT REPORT TYPE */}
+                    {/* SELECT REPORT TYPE */}
                     <div className="space-y-2">
                         <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                            <span className="bg-primary/10 text-primary h-4 w-4 rounded-full flex items-center justify-center text-[9px] font-black">1</span>
-                            ¿Qué evaluar en el reporte?
+                            <FileText className="h-3.5 w-3.5 text-primary" />
+                            Tipo de Reporte a Exportar
                         </label>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <button
@@ -171,11 +195,11 @@ export function CreateReportModal({ isOpen, onClose, reportData, dateFrom, dateT
                         </div>
                     </div>
 
-                    {/* STEP 2: DATES / SCOPE CONFIGURATION */}
+                    {/* DATES / SCOPE CONFIGURATION */}
                     <div className="space-y-3 bg-muted/20 border border-border p-4 rounded-xl">
                         <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                            <span className="bg-primary/10 text-primary h-4 w-4 rounded-full flex items-center justify-center text-[9px] font-black">2</span>
-                            Configuración de fechas
+                            <Calendar className="h-3.5 w-3.5 text-primary" />
+                            Fechas y Alcance de Evaluación
                         </label>
                         
                         {/* Scope for products report */}
@@ -223,7 +247,7 @@ export function CreateReportModal({ isOpen, onClose, reportData, dateFrom, dateT
                                 <label className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">Seleccionar Sesión de Odoo</label>
                                 {sessions.length === 0 ? (
                                     <p className="text-xs italic text-amber-500 font-bold">No hay sesiones disponibles en este periodo.</p>
-                                ) : (
+                               ) : (
                                     <select
                                         value={selectedSessionId || ''}
                                         onChange={(e) => setSelectedSessionId(Number(e.target.value))}
@@ -264,7 +288,7 @@ export function CreateReportModal({ isOpen, onClose, reportData, dateFrom, dateT
                                                 type="date"
                                                 value={customDateFrom}
                                                 onChange={(e) => setCustomDateFrom(e.target.value)}
-                                                className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-bold text-foreground focus:border-primary focus:outline-none text-foreground"
+                                                className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-bold text-foreground focus:border-primary focus:outline-none"
                                             />
                                         </div>
                                         <div className="space-y-1">
@@ -273,35 +297,44 @@ export function CreateReportModal({ isOpen, onClose, reportData, dateFrom, dateT
                                                 type="date"
                                                 value={customDateTo}
                                                 onChange={(e) => setCustomDateTo(e.target.value)}
-                                                className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-bold text-foreground focus:border-primary focus:outline-none text-foreground"
+                                                className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-bold text-foreground focus:border-primary focus:outline-none"
                                             />
                                         </div>
                                     </div>
                                 ) : (
                                     <div className="text-xs font-bold text-foreground bg-background border border-border/80 rounded-lg p-2.5 flex items-center justify-between">
                                         <span className="text-muted-foreground text-[10px] font-black uppercase tracking-wider">Fechas del Dashboard:</span>
-                                        <span>{dateFrom} al {dateTo}</span>
+                                        <span>{formatDateString(dateFrom)} al {formatDateString(dateTo)}</span>
                                     </div>
                                 )}
                             </div>
                         )}
                     </div>
 
-                    {/* STEP 3: REVIEW PARAMETERS CARD */}
+                    {/* REVIEW PARAMETERS CARD */}
                     <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 space-y-2.5">
                         <label className="text-[10px] font-black uppercase tracking-wider text-primary flex items-center gap-1.5">
                             <CheckCircle2 className="h-4 w-4 text-primary" />
-                            3. Revisión del reporte a generar
+                            Estructura de Exportación
                         </label>
                         <div className="grid grid-cols-2 gap-3 text-[10px]">
                             <div>
-                                <span className="text-muted-foreground font-semibold block text-[8px] uppercase tracking-wider">Reporte</span>
+                                <span className="text-muted-foreground font-black block text-[8.5px] uppercase tracking-wider">Reporte</span>
                                 <span className="font-black text-foreground uppercase tracking-wide">
                                     {reportType === 'summary' ? 'Reporte de Ventas' : 'Ventas por Producto'}
                                 </span>
                             </div>
                             <div>
-                                <span className="text-muted-foreground font-semibold block text-[8px] uppercase tracking-wider">Fechas a Evaluar</span>
+                                <span className="text-muted-foreground font-black block text-[8.5px] uppercase tracking-wider">
+                                    {reportType === 'summary' 
+                                        ? 'Periodo Evaluado' 
+                                        : productsScope === 'session' 
+                                            ? 'Sesión Evaluada' 
+                                            : productsScope === 'day' 
+                                                ? 'Día Evaluado' 
+                                                : 'Periodo Evaluado'
+                                    }
+                                </span>
                                 <span className="font-black text-foreground italic">{displayEvalDate}</span>
                             </div>
                         </div>

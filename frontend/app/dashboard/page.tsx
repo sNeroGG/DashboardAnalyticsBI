@@ -101,16 +101,32 @@ export default function DashboardPage() {
             const activeData = tempPrintData || reportData
             if (printReportScope === 'session' && printReportTarget !== null) {
                 let foundName = ''
+                let sessionDate = ''
                 if (activeData?.data) {
                     for (const day of activeData.data) {
                         const found = day.sesiones?.find((s: any) => s.id === Number(printReportTarget))
                         if (found) {
                             foundName = found.name
+                            sessionDate = day.fecha
                             break
                         }
                     }
                 }
-                targetName = foundName || `Sesion ${printReportTarget}`
+                if (foundName) {
+                    let formattedDate = ''
+                    if (sessionDate) {
+                        const parts = sessionDate.split('-')
+                        if (parts.length === 3) {
+                            formattedDate = `${parts[2]}-${parts[1]}-${parts[0]}`
+                        } else {
+                            formattedDate = sessionDate
+                        }
+                    }
+                    const cleanedName = foundName.replace(/^SESION\s+/i, '').replace(/"/g, '').trim()
+                    targetName = formattedDate ? `sesion ${cleanedName}/${formattedDate}` : `sesion ${cleanedName}`
+                } else {
+                    targetName = `Sesion ${printReportTarget}`
+                }
             } else if (printReportScope === 'day' && printReportTarget !== null) {
                 targetName = String(printReportTarget)
             } else {
@@ -293,16 +309,32 @@ export default function DashboardPage() {
         let targetName = 'Periodo'
         if (scope === 'session' && target !== null) {
             let foundName = ''
+            let sessionDate = ''
             if (fetchedReportData?.data) {
                 for (const day of fetchedReportData.data) {
                     const found = day.sesiones?.find((s: any) => s.id === Number(target))
                     if (found) {
                         foundName = found.name
+                        sessionDate = day.fecha
                         break
                     }
                 }
             }
-            targetName = foundName || `Sesion ${target}`
+            if (foundName) {
+                let formattedDate = ''
+                if (sessionDate) {
+                    const parts = sessionDate.split('-')
+                    if (parts.length === 3) {
+                        formattedDate = `${parts[2]}-${parts[1]}-${parts[0]}`
+                    } else {
+                        formattedDate = sessionDate
+                    }
+                }
+                const cleanedName = foundName.replace(/^SESION\s+/i, '').replace(/"/g, '').trim()
+                targetName = formattedDate ? `sesion ${cleanedName}/${formattedDate}` : `sesion ${cleanedName}`
+            } else {
+                targetName = `Sesion ${target}`
+            }
         } else if (scope === 'day' && target !== null) {
             targetName = String(target)
         } else {
