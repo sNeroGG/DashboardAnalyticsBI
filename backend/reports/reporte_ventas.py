@@ -64,7 +64,7 @@ def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=
             print(f"[REPORT VENTAS] Error descargando res.users dinámicamente: {e}")
 
     # Detección dinámica de campos en pos.order
-    base_fields = ["id", "name", "date_order", "amount_total", "state", "user_id", "tip_amount", "session_id", "customer_count"]
+    base_fields = ["id", "name", "date_order", "amount_total", "state", "user_id", "tip_amount", "session_id", "customer_count", "partner_id"]
     order_creator_fields = []
     try:
         odoo.search("pos.order", [("id", "=", 0)], ["order_creator_id", "order_creator_name"])
@@ -137,7 +137,7 @@ def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=
     lines_records = []
     product_to_category = {}
     try:
-        lines_records = odoo.search("pos.order.line", [("order_id", "in", order_ids)], ["order_id", "product_id", "price_subtotal_incl"])
+        lines_records = odoo.search("pos.order.line", [("order_id", "in", order_ids)], ["order_id", "product_id", "qty", "price_unit", "price_subtotal_incl"])
         product_ids = list(set(get_id(line.get("product_id")) for line in lines_records if line.get("product_id")))
         if product_ids:
             rpc_user = os.environ.get("ODOO_RPC_USER")
@@ -279,9 +279,12 @@ def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=
         o_personas = o.get("customer_count") or 1
         summary_days[d_bus]["total_personas"] += o_personas
         
+        o_efectivo = 0.0
+        o_tarjeta = 0.0
         if not o_pays and not payments:
              net_amount = o_total - o_tip
              summary_days[d_bus]["restaurante_efectivo"] += net_amount
+             o_efectivo = net_amount
              pm_name = "Efectivo"
              if pm_name not in summary_metodos:
                  summary_metodos[pm_name] = {"id": 3, "monto": 0.0}
@@ -347,8 +350,10 @@ def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=
                 
                 if pm_id == "2":
                     summary_days[d_bus]["tarjeta"] += net_amount
+                    o_tarjeta += net_amount
                 else:
                     summary_days[d_bus]["restaurante_efectivo"] += net_amount
+                    o_efectivo += net_amount
 
         # VENDEDOR (order_creator_name o order_creator_id con fallback a user_id)
         vendedor_name = None
@@ -393,6 +398,8 @@ def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=
                 "total_cuentas": 0,
                 "total_pagado": 0.0,
                 "propina": 0.0,
+                "restaurante_efectivo": 0.0,
+                "tarjeta": 0.0,
                 "desglose": [],
                 "cuentas": []
             })
@@ -401,9 +408,22 @@ def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=
         summary_days[d_bus]["sesiones"][session_idx]["total_cuentas"] += 1
         summary_days[d_bus]["sesiones"][session_idx]["total_pagado"] += o_total
         summary_days[d_bus]["sesiones"][session_idx]["propina"] += o_tip
+        
+        if "restaurante_efectivo" not in summary_days[d_bus]["sesiones"][session_idx]:
+            summary_days[d_bus]["sesiones"][session_idx]["restaurante_efectivo"] = 0.0
+        if "tarjeta" not in summary_days[d_bus]["sesiones"][session_idx]:
+            summary_days[d_bus]["sesiones"][session_idx]["tarjeta"] = 0.0
+            
+        summary_days[d_bus]["sesiones"][session_idx]["restaurante_efectivo"] += o_efectivo
+        summary_days[d_bus]["sesiones"][session_idx]["tarjeta"] += o_tarjeta
+        
+        partner_val = o.get("partner_id")
+        cliente_name = partner_val[1] if isinstance(partner_val, (list, tuple)) and len(partner_val) > 1 else "Cliente General"
+        
         summary_days[d_bus]["sesiones"][session_idx]["cuentas"].append({
             "id": o_id,
             "nombre": o["name"],
+            "cliente": cliente_name,
             "propina": o_tip,
             "total": o_total,
             "personas": o_personas,
@@ -423,11 +443,35 @@ def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=
 
     usuarios_list = sorted(list(summary_users.values()), key=lambda x: x["ventas"], reverse=True)
     
+    category_names_map = {c["id"]: c["name"] for c in categories}
+    productos_detalle = []
+    for l in lines_records:
+        pid = get_id(l.get("product_id"))
+        p_val = l.get("product_id")
+        p_name = p_val[1] if isinstance(p_val, (list, tuple)) and len(p_val) > 1 else str(pid)
+        
+        # Omitir propina (producto 399) de la sección de productos
+        if pid == 399:
+            continue
+            
+        categ_id = product_to_category.get(pid)
+        categ_name = category_names_map.get(categ_id, "Otros") if categ_id else "Otros"
+        
+        productos_detalle.append({
+            "order_id": get_id(l.get("order_id")),
+            "producto": p_name,
+            "categoria": categ_name,
+            "cantidad": l.get("qty", 0.0),
+            "precio": l.get("price_unit", 0.0),
+            "total": l.get("price_subtotal_incl", 0.0)
+        })
+        
     return {
         "status": "success",
         "data": report_list,
         "usuarios": usuarios_list,
-        "metodos": [{"id": v["id"], "metodo": k, "monto": v["monto"]} for k, v in summary_metodos.items()]
+        "metodos": [{"id": v["id"], "metodo": k, "monto": v["monto"]} for k, v in summary_metodos.items()],
+        "productos": productos_detalle
     }
 
 def generate_active_sessions_report(odoo):
@@ -445,7 +489,7 @@ def generate_active_sessions_report(odoo):
     payment_map = {str(p["id"]): p["name"] for p in masters.get("pos.payment.method", [])}
 
     # Detección dinámica de campos en pos.order
-    base_fields = ["id", "name", "date_order", "amount_total", "state", "user_id", "tip_amount", "session_id", "customer_count"]
+    base_fields = ["id", "name", "date_order", "amount_total", "state", "user_id", "tip_amount", "session_id", "customer_count", "partner_id"]
     order_creator_fields = []
     try:
         odoo.search("pos.order", [("id", "=", 0)], ["order_creator_id", "order_creator_name"])

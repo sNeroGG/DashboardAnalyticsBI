@@ -20,6 +20,7 @@ export interface ReportCuenta {
     total: number
     propina: number
     estado: string
+    cliente?: string
 }
 
 export interface ReportSession {
@@ -28,6 +29,8 @@ export interface ReportSession {
     total_cuentas: number
     total_pagado: number
     propina: number
+    restaurante_efectivo?: number
+    tarjeta?: number
     desglose?: ReportSessionDesglose[]
     cuentas?: ReportCuenta[]
 }
@@ -62,6 +65,7 @@ export interface ReportData {
     data: ReportRow[]
     usuarios: UserData[]
     metodos: POSPaymentMethodData[]
+    productos?: any[]
     advanced_analytics?: any
 }
 

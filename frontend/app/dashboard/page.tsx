@@ -15,6 +15,8 @@ import { MonthComparison } from '@/components/dashboard/month-comparison'
 import { PrintSummary } from '@/components/dashboard/print-summary'
 import { PrintActiveSessionsSummary } from '@/components/dashboard/print-active-sessions-summary'
 import { ActiveSessionView } from '@/components/dashboard/active-session-view'
+import { CreateReportModal } from '@/components/dashboard/create-report-modal'
+import { PrintSalesReport } from '@/components/dashboard/print-sales-report'
 import { dashboardAPI } from '@/lib/api'
 import type { ReportData, Masters, ActiveSession } from '@/lib/types'
 import { Button } from '@/components/ui/button'
@@ -43,6 +45,18 @@ export default function DashboardPage() {
     const [selectedActiveSessionIds, setSelectedActiveSessionIds] = useState<number[]>([])
     const [selectedActiveStates, setSelectedActiveStates] = useState<string[]>(['draft', 'paid', 'done', 'invoiced', 'cancel'])
 
+    // Report modal and print states
+    const [isReportModalOpen, setIsReportModalOpen] = useState(false)
+    const [printLayout, setPrintLayout] = useState<'summary' | 'sales_report'>('summary')
+    const [printReportScope, setPrintReportScope] = useState<'period' | 'session'>('period')
+    const [printReportSessionId, setPrintReportSessionId] = useState<number | null>(null)
+
+    // Analitica tab states
+    const [analiticaDateFrom, setAnaliticaDateFrom] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd'T'00:00"))
+    const [analiticaDateTo, setAnaliticaDateTo] = useState(format(new Date(), "yyyy-MM-dd'T'23:59"))
+    const [analiticaReportData, setAnaliticaReportData] = useState<ReportData | null>(null)
+    const [isAnaliticaLoading, setIsAnaliticaLoading] = useState(false)
+
     const router = useRouter()
 
     const odooStates = [
@@ -63,10 +77,36 @@ export default function DashboardPage() {
         loadMasters()
         if (activeTab === 'active_session') {
             fetchActiveSessions()
+        } else if (activeTab === 'analitica') {
+            if (!analiticaReportData) {
+                fetchAnaliticaReport()
+            }
         } else {
             fetchReport()
         }
     }, [activeTab]) // Re-fetch or apply rules on tab change
+
+    const fetchAnaliticaReport = async () => {
+        setIsAnaliticaLoading(true)
+        try {
+            const fromTimestamp = analiticaDateFrom.replace('T', ' ') + ':00'
+            const toTimestamp = analiticaDateTo.replace('T', ' ') + ':59'
+            
+            const { data } = await dashboardAPI.getReportVentas({
+                date_from: fromTimestamp,
+                date_to: toTimestamp,
+                users: [],
+                payments: [],
+                groups: [],
+                states: []
+            })
+            setAnaliticaReportData(data)
+        } catch (error) {
+            console.error('Error fetching analytics report', error)
+        } finally {
+            setIsAnaliticaLoading(false)
+        }
+    }
 
     const fetchActiveSessions = async () => {
         setIsActiveSessionLoading(true)
@@ -151,7 +191,8 @@ export default function DashboardPage() {
         router.push('/login')
     }
 
-    const handlePrint = () => {
+    const handlePrintSummary = () => {
+        setPrintLayout('summary')
         const originalTitle = document.title
         document.title = `Resumen General - Herra - ${dateFrom} al ${dateTo}`
 
@@ -159,6 +200,38 @@ export default function DashboardPage() {
         setTimeout(() => {
             window.print()
             // Restore original title after print dialog has loaded
+            setTimeout(() => {
+                document.title = originalTitle
+            }, 500)
+        }, 150)
+    }
+
+    const handlePrintSalesReport = (scope: 'period' | 'session', sessionId: number | null) => {
+        setPrintLayout('sales_report')
+        setPrintReportScope(scope)
+        setPrintReportSessionId(sessionId)
+
+        const originalTitle = document.title
+        let targetName = 'Periodo'
+        if (scope === 'session' && sessionId !== null) {
+            let foundName = ''
+            if (reportData?.data) {
+                for (const day of reportData.data) {
+                    const found = day.sesiones?.find((s: any) => s.id === sessionId)
+                    if (found) {
+                        foundName = found.name
+                        break
+                    }
+                }
+            }
+            targetName = foundName || `Sesion ${sessionId}`
+        } else {
+            targetName = `${dateFrom} al ${dateTo}`
+        }
+        document.title = `Reporte de Ventas por Producto - Herra - ${targetName}`
+
+        setTimeout(() => {
+            window.print()
             setTimeout(() => {
                 document.title = originalTitle
             }, 500)
@@ -195,6 +268,31 @@ export default function DashboardPage() {
         }))
     }, [activeSessions, selectedActiveSessionIds, selectedActiveStates])
 
+    const isInitialLoading = !masters || (isLoading && !reportData && activeTab !== 'active_session') || (isActiveSessionLoading && !activeSessions && activeTab === 'active_session')
+
+    if (isInitialLoading) {
+        return (
+            <div className="min-h-screen bg-background flex flex-col items-center justify-center space-y-6">
+                <div className="flex flex-col items-center space-y-4">
+                    <div className="relative flex items-center justify-center">
+                        {/* Outer rotating ring */}
+                        <div className="h-16 w-16 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+                        {/* Inner glowing circle */}
+                        <div className="absolute h-8 w-8 rounded-full bg-primary/10 animate-ping" />
+                    </div>
+                    <div className="text-center space-y-2">
+                        <h2 className="text-xl font-black italic text-primary tracking-tighter uppercase animate-pulse">
+                            BI Analytics Odoo
+                        </h2>
+                        <p className="text-xs text-muted-foreground font-semibold uppercase tracking-widest">
+                            Cargando datos del sistema...
+                        </p>
+                    </div>
+                </div>
+            </div>
+        )
+    }
+
     return (
         <>
             <div className="min-h-screen bg-background p-4 md:p-8 space-y-8 animate-in fade-in duration-500 print:hidden">
@@ -211,9 +309,9 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex items-center gap-2">
                         {reportData && (
-                            <Button variant="outline" size="sm" onClick={handlePrint} className="gap-2 border-primary/20 hover:bg-primary/10">
+                            <Button variant="outline" size="sm" onClick={() => setIsReportModalOpen(true)} className="gap-2 border-primary/20 hover:bg-primary/10">
                                 <FileText className="h-4 w-4" />
-                                Generar PDF
+                                Crear Reporte
                             </Button>
                         )}
                         <Button variant="outline" size="sm" onClick={() => fetchReport(true)} className="gap-2 border-primary/20 hover:bg-primary/10">
@@ -340,7 +438,45 @@ export default function DashboardPage() {
 
                         {/* ANALITICA TAB CONTENT */}
                         {activeTab === 'analitica' && (
-                            <AdvancedAnalytics reportData={reportData} />
+                            <div className="space-y-6">
+                                {/* Filtros por Timestamp */}
+                                <div className="flex flex-col sm:flex-row items-end gap-4 bg-card border border-border p-4 rounded-2xl shadow-sm">
+                                    <div className="flex-1 space-y-1.5 w-full">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Desde (Timestamp)</label>
+                                        <input 
+                                            type="datetime-local" 
+                                            value={analiticaDateFrom} 
+                                            onChange={(e) => setAnaliticaDateFrom(e.target.value)}
+                                            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs font-bold text-foreground focus:border-primary focus:outline-none text-foreground"
+                                        />
+                                    </div>
+                                    <div className="flex-1 space-y-1.5 w-full">
+                                        <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Hasta (Timestamp)</label>
+                                        <input 
+                                            type="datetime-local" 
+                                            value={analiticaDateTo} 
+                                            onChange={(e) => setAnaliticaDateTo(e.target.value)}
+                                            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs font-bold text-foreground focus:border-primary focus:outline-none text-foreground"
+                                        />
+                                    </div>
+                                    <Button 
+                                        onClick={fetchAnaliticaReport} 
+                                        disabled={isAnaliticaLoading}
+                                        className="bg-primary hover:bg-primary/90 text-primary-foreground font-black text-xs h-9 px-6 rounded-lg w-full sm:w-auto"
+                                    >
+                                        {isAnaliticaLoading ? 'Cargando...' : 'Aplicar Rango'}
+                                    </Button>
+                                </div>
+
+                                {isAnaliticaLoading && !analiticaReportData ? (
+                                    <div className="h-64 flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl bg-muted/30">
+                                        <div className="h-10 w-10 rounded-full border-4 border-primary/20 border-t-primary animate-spin mb-4" />
+                                        <p className="text-muted-foreground font-medium">Cargando métricas de analítica...</p>
+                                    </div>
+                                ) : (
+                                    <AdvancedAnalytics reportData={analiticaReportData || reportData} />
+                                )}
+                            </div>
                         )}
 
                         {/* COMPARATIVA TAB CONTENT */}
@@ -380,11 +516,29 @@ export default function DashboardPage() {
                 <div className="hidden print:block bg-white text-black p-4 w-full h-full text-[10px] font-sans">
                     <PrintActiveSessionsSummary sessions={activeSessions} isActive={isActiveSession} />
                 </div>
+            ) : printLayout === 'sales_report' && reportData ? (
+                <div className="hidden print:block bg-white text-black p-4 w-full h-full text-[10px] font-sans">
+                    <PrintSalesReport 
+                        reportData={reportData} 
+                        scope={printReportScope} 
+                        sessionId={printReportSessionId} 
+                        dateFrom={dateFrom} 
+                        dateTo={dateTo} 
+                    />
+                </div>
             ) : reportData ? (
                 <div className="hidden print:block bg-white text-black p-4 w-full h-full text-[10px] font-sans">
                     <PrintSummary reportData={reportData} dateFrom={dateFrom} dateTo={dateTo} />
                 </div>
             ) : null}
+
+            <CreateReportModal
+                isOpen={isReportModalOpen}
+                onClose={() => setIsReportModalOpen(false)}
+                reportData={reportData}
+                onPrintSummary={handlePrintSummary}
+                onPrintSalesReport={handlePrintSalesReport}
+            />
         </>
     )
 }
