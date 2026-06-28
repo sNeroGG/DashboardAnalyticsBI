@@ -50,6 +50,8 @@ export default function DashboardPage() {
     const [printLayout, setPrintLayout] = useState<'summary' | 'sales_report'>('summary')
     const [printReportScope, setPrintReportScope] = useState<'period' | 'day' | 'session'>('period')
     const [printReportTarget, setPrintReportTarget] = useState<string | number | null>(null)
+    const [tempPrintData, setTempPrintData] = useState<ReportData | null>(null)
+    const [isPrintLoading, setIsPrintLoading] = useState(false)
 
     // Analitica tab states
     const [analiticaDateFrom, setAnaliticaDateFrom] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd'T'00:00"))
@@ -191,23 +193,43 @@ export default function DashboardPage() {
         router.push('/login')
     }
 
-    const handlePrintSummary = () => {
-        setPrintLayout('summary')
-        const originalTitle = document.title
-        document.title = `Resumen General - Herra - ${dateFrom} al ${dateTo}`
+    const handleGenerateReport = async (
+        type: 'summary' | 'products',
+        scope: 'period' | 'day' | 'session',
+        target: string | number | null,
+        customDateFrom?: string,
+        customDateTo?: string
+    ) => {
+        let fetchFrom = dateFrom
+        let fetchTo = dateTo
 
-        // Defer printing slightly to allow Chromium browsers (Chrome/Edge) to register the updated title
-        setTimeout(() => {
-            window.print()
-            // Restore original title after print dialog has loaded
-            setTimeout(() => {
-                document.title = originalTitle
-            }, 500)
-        }, 150)
-    }
+        if (scope === 'day' && target !== null) {
+            fetchFrom = String(target)
+            fetchTo = String(target)
+        } else if (customDateFrom && customDateTo) {
+            fetchFrom = customDateFrom
+            fetchTo = customDateTo
+        }
 
-    const handlePrintSalesReport = (scope: 'period' | 'day' | 'session', target: string | number | null) => {
-        setPrintLayout('sales_report')
+        let fetchedReportData = reportData
+        // Si el periodo/día es diferente al del dashboard actual, cargamos en segundo plano
+        if (fetchFrom !== dateFrom || fetchTo !== dateTo) {
+            const { data } = await dashboardAPI.getReportVentas({
+                date_from: fetchFrom,
+                date_to: fetchTo,
+                users: [],
+                payments: [],
+                groups: [],
+                states: []
+            })
+            fetchedReportData = data
+            setTempPrintData(data)
+        } else {
+            setTempPrintData(null)
+        }
+
+        // Establecer tipo de layout y alcance
+        setPrintLayout(type === 'summary' ? 'summary' : 'sales_report')
         setPrintReportScope(scope)
         setPrintReportTarget(target)
 
@@ -215,8 +237,8 @@ export default function DashboardPage() {
         let targetName = 'Periodo'
         if (scope === 'session' && target !== null) {
             let foundName = ''
-            if (reportData?.data) {
-                for (const day of reportData.data) {
+            if (fetchedReportData?.data) {
+                for (const day of fetchedReportData.data) {
                     const found = day.sesiones?.find((s: any) => s.id === Number(target))
                     if (found) {
                         foundName = found.name
@@ -228,16 +250,23 @@ export default function DashboardPage() {
         } else if (scope === 'day' && target !== null) {
             targetName = String(target)
         } else {
-            targetName = `${dateFrom} al ${dateTo}`
+            targetName = `${fetchFrom} al ${fetchTo}`
         }
-        document.title = `Reporte de Ventas por Producto - Herra - ${targetName}`
 
-        setTimeout(() => {
-            window.print()
+        document.title = type === 'summary'
+            ? `Resumen General - Herra - ${targetName}`
+            : `Reporte de Ventas por Producto - Herra - ${targetName}`
+
+        // Esperar un momento a que react renderice el nuevo estado con tempPrintData antes de imprimir
+        return new Promise<void>((resolve) => {
             setTimeout(() => {
-                document.title = originalTitle
-            }, 500)
-        }, 150)
+                window.print()
+                setTimeout(() => {
+                    document.title = originalTitle
+                    resolve()
+                }, 500)
+            }, 300)
+        })
     }
 
     const handleActiveSessionPrint = () => {
@@ -518,19 +547,19 @@ export default function DashboardPage() {
                 <div className="hidden print:block bg-white text-black p-4 w-full h-full text-[10px] font-sans">
                     <PrintActiveSessionsSummary sessions={activeSessions} isActive={isActiveSession} />
                 </div>
-            ) : printLayout === 'sales_report' && reportData ? (
+            ) : printLayout === 'sales_report' && (tempPrintData || reportData) ? (
                 <div className="hidden print:block bg-white text-black p-4 w-full h-full text-[10px] font-sans">
                     <PrintSalesReport 
-                        reportData={reportData} 
+                        reportData={tempPrintData || reportData} 
                         scope={printReportScope} 
                         target={printReportTarget} 
                         dateFrom={dateFrom} 
                         dateTo={dateTo} 
                     />
                 </div>
-            ) : reportData ? (
+            ) : (tempPrintData || reportData) ? (
                 <div className="hidden print:block bg-white text-black p-4 w-full h-full text-[10px] font-sans">
-                    <PrintSummary reportData={reportData} dateFrom={dateFrom} dateTo={dateTo} />
+                    <PrintSummary reportData={tempPrintData || reportData} dateFrom={dateFrom} dateTo={dateTo} />
                 </div>
             ) : null}
 
@@ -540,8 +569,7 @@ export default function DashboardPage() {
                 reportData={reportData}
                 dateFrom={dateFrom}
                 dateTo={dateTo}
-                onPrintSummary={handlePrintSummary}
-                onPrintSalesReport={handlePrintSalesReport}
+                onGenerateReport={handleGenerateReport}
             />
         </>
     )
