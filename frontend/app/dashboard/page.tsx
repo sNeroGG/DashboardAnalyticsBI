@@ -498,7 +498,7 @@ export default function DashboardPage() {
                         onPaymentsChange={setSelectedPayments}
                         onProductGroupsChange={setSelectedProductGroups}
                         onStatesChange={setSelectedStates}
-                        onFetchReport={fetchReport}
+                        onFetchReport={() => fetchReport(true)}
                         isLoading={isLoading}
                         reportData={reportData || undefined}
                     />

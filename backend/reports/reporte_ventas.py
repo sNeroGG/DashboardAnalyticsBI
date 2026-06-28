@@ -139,6 +139,7 @@ def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=
     try:
         lines_records = odoo.search("pos.order.line", [("order_id", "in", order_ids)], ["order_id", "product_id", "qty", "price_unit", "price_subtotal_incl"])
         product_ids = list(set(get_id(line.get("product_id")) for line in lines_records if line.get("product_id")))
+        product_names = {}
         if product_ids:
             rpc_user = os.environ.get("ODOO_RPC_USER")
             rpc_key = os.environ.get("ODOO_RPC_KEY")
@@ -159,18 +160,20 @@ def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=
                             odoo.db, uid, rpc_key, 
                             "product.product", "search_read", 
                             [[("id", "in", product_ids)]], 
-                            {"fields": ["id", "pos_categ_ids"]}
+                            {"fields": ["id", "display_name", "pos_categ_ids"]}
                         )
                         for p in products_data:
                             product_to_category[p["id"]] = get_id(p.get("pos_categ_ids"))
+                            product_names[p["id"]] = p.get("display_name") or f"Producto {p['id']}"
                         queried_via_rpc = True
                 except Exception as rpc_err:
                     print(f"Error querying product categories via XML-RPC: {rpc_err}")
             
             if not queried_via_rpc:
-                products = odoo.search("product.product", [("id", "in", product_ids)], ["id", product_category_field])
+                products = odoo.search("product.product", [("id", "in", product_ids)], ["id", "display_name", product_category_field])
                 for p in products:
                     product_to_category[p["id"]] = get_id(p.get(product_category_field))
+                    product_names[p["id"]] = p.get("display_name") or f"Producto {p['id']}"
     except Exception as e:
         print(f"Error loading lines/product categories: {e}")
 
@@ -448,7 +451,7 @@ def generate_report(odoo, date_from, date_to, users=None, payments=None, groups=
     for l in lines_records:
         pid = get_id(l.get("product_id"))
         p_val = l.get("product_id")
-        p_name = p_val[1] if isinstance(p_val, (list, tuple)) and len(p_val) > 1 else str(pid)
+        p_name = product_names.get(pid) or (p_val[1] if isinstance(p_val, (list, tuple)) and len(p_val) > 1 else f"Producto {pid}")
         
         # Omitir propina (producto 399) de la sección de productos
         if pid == 399:
