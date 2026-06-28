@@ -95,7 +95,7 @@ export default function DashboardPage() {
     useEffect(() => {
         if (isReadyToPrint) {
             const originalTitle = document.title
-            
+
             // Set print title
             let targetName = 'Periodo'
             const activeData = tempPrintData || reportData
@@ -132,7 +132,7 @@ export default function DashboardPage() {
             } else {
                 targetName = `${printDateFrom} al ${printDateTo}`
             }
-            
+
             document.title = printLayout === 'summary'
                 ? `Resumen General - Herra - ${targetName}`
                 : `Reporte de Ventas por Producto - Herra - ${targetName}`
@@ -151,7 +151,7 @@ export default function DashboardPage() {
         try {
             const fromTimestamp = analiticaDateFrom.replace('T', ' ') + ':00'
             const toTimestamp = analiticaDateTo.replace('T', ' ') + ':59'
-            
+
             const { data } = await dashboardAPI.getReportVentas({
                 date_from: fromTimestamp,
                 date_to: toTimestamp,
@@ -278,7 +278,7 @@ export default function DashboardPage() {
             try {
                 const queryFrom = scope === 'day' ? `${target} 00:00:00` : `${customDateFrom} 00:00:00`
                 const queryTo = scope === 'day' ? `${target} 23:59:59` : `${customDateTo} 23:59:59`
-                
+
                 const { data } = await dashboardAPI.getReportVentas({
                     date_from: queryFrom,
                     date_to: queryTo,
@@ -387,14 +387,14 @@ export default function DashboardPage() {
 
     const filteredActiveSessions = useMemo(() => {
         if (!activeSessions) return []
-        
-        const matchedSessions = activeSessions.filter(s => 
+
+        const matchedSessions = activeSessions.filter(s =>
             selectedActiveSessionIds.includes(s.id)
         )
-        
+
         return matchedSessions.map(s => ({
             ...s,
-            cuentas: (s.cuentas || []).filter(c => 
+            cuentas: (s.cuentas || []).filter(c =>
                 selectedActiveStates.includes(c.estado || '')
             )
         }))
@@ -435,7 +435,7 @@ export default function DashboardPage() {
                             <LayoutDashboard className="h-8 w-8 text-primary" />
                         </div>
                         <div>
-                            <h1 className="text-3xl font-black text-foreground tracking-tighter italic">BI ANALYTICS <span className="text-primary font-normal not-italic">Odoo v2.1</span></h1>
+                            <h1 className="text-3xl font-black text-foreground tracking-tighter italic">BI ANALYTICS <span className="text-primary font-normal not-italic">Odoo v3.0</span></h1>
                             <p className="text-sm text-muted-foreground font-medium">Panel de Control Estratégico Herradura</p>
                         </div>
                     </div>
@@ -537,12 +537,12 @@ export default function DashboardPage() {
                 )}
 
                 {activeTab === 'active_session' ? (
-                    <ActiveSessionView 
-                        sessions={activeSessions} 
+                    <ActiveSessionView
+                        sessions={activeSessions}
                         filteredSessions={filteredActiveSessions}
                         isActive={isActiveSession}
-                        isLoading={isActiveSessionLoading} 
-                        onRefresh={fetchActiveSessions} 
+                        isLoading={isActiveSessionLoading}
+                        onRefresh={fetchActiveSessions}
                         onPrint={handleActiveSessionPrint}
                         selectedSessionIds={selectedActiveSessionIds}
                         onSelectedSessionIdsChange={setSelectedActiveSessionIds}
@@ -580,24 +580,24 @@ export default function DashboardPage() {
                                 <div className="flex flex-col sm:flex-row items-end gap-4 bg-card border border-border p-4 rounded-2xl shadow-sm">
                                     <div className="flex-1 space-y-1.5 w-full">
                                         <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Desde (Timestamp)</label>
-                                        <input 
-                                            type="datetime-local" 
-                                            value={analiticaDateFrom} 
+                                        <input
+                                            type="datetime-local"
+                                            value={analiticaDateFrom}
                                             onChange={(e) => setAnaliticaDateFrom(e.target.value)}
                                             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs font-bold text-foreground focus:border-primary focus:outline-none text-foreground"
                                         />
                                     </div>
                                     <div className="flex-1 space-y-1.5 w-full">
                                         <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Hasta (Timestamp)</label>
-                                        <input 
-                                            type="datetime-local" 
-                                            value={analiticaDateTo} 
+                                        <input
+                                            type="datetime-local"
+                                            value={analiticaDateTo}
                                             onChange={(e) => setAnaliticaDateTo(e.target.value)}
                                             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs font-bold text-foreground focus:border-primary focus:outline-none text-foreground"
                                         />
                                     </div>
-                                    <Button 
-                                        onClick={fetchAnaliticaReport} 
+                                    <Button
+                                        onClick={fetchAnaliticaReport}
                                         disabled={isAnaliticaLoading}
                                         className="bg-primary hover:bg-primary/90 text-primary-foreground font-black text-xs h-9 px-6 rounded-lg w-full sm:w-auto"
                                     >
@@ -655,12 +655,12 @@ export default function DashboardPage() {
                 </div>
             ) : printLayout === 'sales_report' && (tempPrintData || reportData) ? (
                 <div className="hidden print:block print-layout bg-white text-black p-4 w-full h-full text-[10px] font-sans">
-                    <PrintSalesReport 
-                        reportData={tempPrintData || reportData} 
-                        scope={printReportScope} 
-                        target={printReportTarget} 
-                        dateFrom={printDateFrom} 
-                        dateTo={printDateTo} 
+                    <PrintSalesReport
+                        reportData={tempPrintData || reportData}
+                        scope={printReportScope}
+                        target={printReportTarget}
+                        dateFrom={printDateFrom}
+                        dateTo={printDateTo}
                     />
                 </div>
             ) : (tempPrintData || reportData) ? (
