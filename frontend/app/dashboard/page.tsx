@@ -52,6 +52,10 @@ export default function DashboardPage() {
     const [printReportTarget, setPrintReportTarget] = useState<string | number | null>(null)
     const [tempPrintData, setTempPrintData] = useState<ReportData | null>(null)
     const [isPrintLoading, setIsPrintLoading] = useState(false)
+    const [printDateFrom, setPrintDateFrom] = useState(dateFrom)
+    const [printDateTo, setPrintDateTo] = useState(dateTo)
+    const [isReadyToPrint, setIsReadyToPrint] = useState(false)
+    const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null)
 
     // Analitica tab states
     const [analiticaDateFrom, setAnaliticaDateFrom] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd'T'00:00"))
@@ -87,6 +91,44 @@ export default function DashboardPage() {
             fetchReport()
         }
     }, [activeTab]) // Re-fetch or apply rules on tab change
+
+    useEffect(() => {
+        if (isReadyToPrint) {
+            const originalTitle = document.title
+            
+            // Set print title
+            let targetName = 'Periodo'
+            const activeData = tempPrintData || reportData
+            if (printReportScope === 'session' && printReportTarget !== null) {
+                let foundName = ''
+                if (activeData?.data) {
+                    for (const day of activeData.data) {
+                        const found = day.sesiones?.find((s: any) => s.id === Number(printReportTarget))
+                        if (found) {
+                            foundName = found.name
+                            break
+                        }
+                    }
+                }
+                targetName = foundName || `Sesion ${printReportTarget}`
+            } else if (printReportScope === 'day' && printReportTarget !== null) {
+                targetName = String(printReportTarget)
+            } else {
+                targetName = `${printDateFrom} al ${printDateTo}`
+            }
+            
+            document.title = printLayout === 'summary'
+                ? `Resumen General - Herra - ${targetName}`
+                : `Reporte de Ventas por Producto - Herra - ${targetName}`
+
+            const timer = setTimeout(() => {
+                window.print()
+                document.title = originalTitle // RESTORE TITLE
+                setIsReadyToPrint(false)
+            }, 300)
+            return () => clearTimeout(timer)
+        }
+    }, [isReadyToPrint, printLayout, printReportScope, printReportTarget, printDateFrom, printDateTo, tempPrintData, reportData])
 
     const fetchAnaliticaReport = async () => {
         setIsAnaliticaLoading(true)
@@ -180,6 +222,7 @@ export default function DashboardPage() {
             }
 
             if (force) console.log('Reporte actualizado desde Odoo')
+            setLastSyncTime(new Date())
         } catch (error) {
             console.error('Error fetching report', error)
         } finally {
@@ -228,10 +271,12 @@ export default function DashboardPage() {
             setTempPrintData(null)
         }
 
-        // Establecer tipo de layout y alcance
+        // Establecer tipo de layout, alcance y fechas reales de impresión
         setPrintLayout(type === 'summary' ? 'summary' : 'sales_report')
         setPrintReportScope(scope)
         setPrintReportTarget(target)
+        setPrintDateFrom(fetchFrom)
+        setPrintDateTo(fetchTo)
 
         const originalTitle = document.title
         let targetName = 'Periodo'
@@ -257,15 +302,29 @@ export default function DashboardPage() {
             ? `Resumen General - Herra - ${targetName}`
             : `Reporte de Ventas por Producto - Herra - ${targetName}`
 
-        // Esperar un momento a que react renderice el nuevo estado con tempPrintData antes de imprimir
+        // Activar la señal de impresión para el useEffect
+        setIsReadyToPrint(true)
+
+        // Esperar a que se complete el flujo de impresión (se restaure el título) para resolver el modal
         return new Promise<void>((resolve) => {
-            setTimeout(() => {
-                window.print()
-                setTimeout(() => {
-                    document.title = originalTitle
+            const checkInterval = setInterval(() => {
+                if (document.title === originalTitle) {
+                    clearInterval(checkInterval)
+                    // Limpiar datos temporales después de imprimir
+                    setTimeout(() => {
+                        setTempPrintData(null)
+                    }, 500)
                     resolve()
-                }, 500)
-            }, 300)
+                }
+            }, 200)
+
+            // Por seguridad, resolver después de 10 segundos
+            setTimeout(() => {
+                clearInterval(checkInterval)
+                document.title = originalTitle
+                setTempPrintData(null)
+                resolve()
+            }, 10000)
         })
     }
 
@@ -344,6 +403,11 @@ export default function DashboardPage() {
                                 <FileText className="h-4 w-4" />
                                 Crear Reporte
                             </Button>
+                        )}
+                        {lastSyncTime && (
+                            <span className="text-[10px] text-muted-foreground font-medium hidden md:inline bg-muted/40 px-2.5 py-1.5 rounded-lg border border-border/50">
+                                Última sinc: <span className="font-bold text-foreground">{format(lastSyncTime, 'dd/MM/yyyy HH:mm:ss')}</span>
+                            </span>
                         )}
                         <Button variant="outline" size="sm" onClick={() => fetchReport(true)} className="gap-2 border-primary/20 hover:bg-primary/10">
                             <RefreshCcw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
