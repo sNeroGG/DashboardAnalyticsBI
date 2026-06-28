@@ -48,8 +48,8 @@ export default function DashboardPage() {
     // Report modal and print states
     const [isReportModalOpen, setIsReportModalOpen] = useState(false)
     const [printLayout, setPrintLayout] = useState<'summary' | 'sales_report'>('summary')
-    const [printReportScope, setPrintReportScope] = useState<'period' | 'session'>('period')
-    const [printReportSessionId, setPrintReportSessionId] = useState<number | null>(null)
+    const [printReportScope, setPrintReportScope] = useState<'period' | 'day' | 'session'>('period')
+    const [printReportTarget, setPrintReportTarget] = useState<string | number | null>(null)
 
     // Analitica tab states
     const [analiticaDateFrom, setAnaliticaDateFrom] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd'T'00:00"))
@@ -206,25 +206,27 @@ export default function DashboardPage() {
         }, 150)
     }
 
-    const handlePrintSalesReport = (scope: 'period' | 'session', sessionId: number | null) => {
+    const handlePrintSalesReport = (scope: 'period' | 'day' | 'session', target: string | number | null) => {
         setPrintLayout('sales_report')
         setPrintReportScope(scope)
-        setPrintReportSessionId(sessionId)
+        setPrintReportTarget(target)
 
         const originalTitle = document.title
         let targetName = 'Periodo'
-        if (scope === 'session' && sessionId !== null) {
+        if (scope === 'session' && target !== null) {
             let foundName = ''
             if (reportData?.data) {
                 for (const day of reportData.data) {
-                    const found = day.sesiones?.find((s: any) => s.id === sessionId)
+                    const found = day.sesiones?.find((s: any) => s.id === Number(target))
                     if (found) {
                         foundName = found.name
                         break
                     }
                 }
             }
-            targetName = foundName || `Sesion ${sessionId}`
+            targetName = foundName || `Sesion ${target}`
+        } else if (scope === 'day' && target !== null) {
+            targetName = String(target)
         } else {
             targetName = `${dateFrom} al ${dateTo}`
         }
@@ -521,7 +523,7 @@ export default function DashboardPage() {
                     <PrintSalesReport 
                         reportData={reportData} 
                         scope={printReportScope} 
-                        sessionId={printReportSessionId} 
+                        target={printReportTarget} 
                         dateFrom={dateFrom} 
                         dateTo={dateTo} 
                     />

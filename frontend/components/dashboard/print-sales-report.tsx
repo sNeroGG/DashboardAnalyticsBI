@@ -3,13 +3,13 @@ import type { ReportData } from '@/lib/types'
 
 interface PrintSalesReportProps {
     reportData: ReportData | null
-    scope: 'period' | 'session'
-    sessionId: number | null
+    scope: 'period' | 'day' | 'session'
+    target: string | number | null
     dateFrom: string
     dateTo: string
 }
 
-export function PrintSalesReport({ reportData, scope, sessionId, dateFrom, dateTo }: PrintSalesReportProps) {
+export function PrintSalesReport({ reportData, scope, target, dateFrom, dateTo }: PrintSalesReportProps) {
     if (!reportData) return null
 
     // 1. Determine Title and Scope Data
@@ -20,11 +20,11 @@ export function PrintSalesReport({ reportData, scope, sessionId, dateFrom, dateT
     let cardTotal = 0
     let tipTotal = 0
 
-    if (scope === 'session' && sessionId !== null) {
+    if (scope === 'session' && target !== null) {
         let targetSession: any = null
         if (reportData.data) {
             for (const day of reportData.data) {
-                const found = day.sesiones?.find((s: any) => s.id === sessionId)
+                const found = day.sesiones?.find((s: any) => s.id === Number(target))
                 if (found) {
                     targetSession = found
                     break
@@ -46,7 +46,37 @@ export function PrintSalesReport({ reportData, scope, sessionId, dateFrom, dateT
             cardTotal = targetSession.tarjeta || 0
             tipTotal = targetSession.propina || 0
         } else {
-            titleRange = 'SESION NO ENCONTRADA'
+            titleRange = `SESION ID ${target} NO ENCONTRADA`
+        }
+    } else if (scope === 'day' && target !== null) {
+        const dayData = reportData.data?.find((d: any) => d.fecha === String(target))
+        
+        if (dayData) {
+            titleRange = `Día Evaluado: ${target}`
+            
+            // Gather all accounts of all sessions in this day
+            const dayAccounts: { cliente: string; total: number }[] = []
+            const dayOrderIds = new Set<number>()
+            
+            dayData.sesiones?.forEach((s: any) => {
+                if (s.cuentas) {
+                    s.cuentas.forEach((c: any) => {
+                        dayAccounts.push({
+                            cliente: c.cliente || 'Cliente General',
+                            total: c.total || 0
+                        })
+                        dayOrderIds.add(c.id)
+                    })
+                }
+            })
+            accounts = dayAccounts
+            filteredProducts = (reportData.productos || []).filter((p: any) => dayOrderIds.has(p.order_id))
+            
+            cashTotal = dayData.restaurante_efectivo || 0
+            cardTotal = dayData.tarjeta || 0
+            tipTotal = dayData.propina || 0
+        } else {
+            titleRange = `DIA ${target} NO ENCONTRADO`
         }
     } else {
         titleRange = `Periodo del ${dateFrom} al ${dateTo}`
